@@ -2,13 +2,16 @@
 
 use std::fmt;
 
+use super::*;
 use crate::protocol::sample_spec::CHANNELS_MAX;
+use crate::protocol::ProtocolError;
 
 use enum_primitive_derive::Primitive;
 
 /// Channel position labels.
-#[derive(Debug, Copy, Clone, Primitive, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Primitive, PartialEq, Eq, Default)]
 pub enum ChannelPosition {
+    #[default]
     Mono = 0,
     /// Apple, Dolby call this 'Left'.
     FrontLeft = 1,
@@ -93,10 +96,7 @@ pub struct ChannelMap {
 
 impl Default for ChannelMap {
     fn default() -> Self {
-        Self {
-            channels: 0,
-            map: [ChannelPosition::Mono; CHANNELS_MAX as usize],
-        }
+        Self::mono()
     }
 }
 
@@ -104,20 +104,37 @@ impl Default for ChannelMap {
 
 impl ChannelMap {
     /// Creates an empty channel map.
-    pub fn new() -> Self {
-        Default::default()
+    pub fn empty() -> Self {
+        ChannelMap {
+            channels: 0,
+            map: [Default::default(); CHANNELS_MAX as usize],
+        }
+    }
+
+    pub fn mono() -> Self {
+        Self {
+            channels: 1,
+            map: [Default::default(); CHANNELS_MAX as usize],
+        }
+    }
+
+    pub fn stereo() -> Self {
+        let mut map = Self::default();
+        map.push(ChannelPosition::FrontLeft);
+        map.push(ChannelPosition::FrontRight);
+        map
     }
 
     /// Tries to append another `ChannelPosition` to the end of this map.
     ///
-    /// If the map is already at max. capacity, returns a `MapFullError`.
-    pub fn push(&mut self, position: ChannelPosition) -> Result<(), MapFullError> {
-        *(self
-            .map
-            .get_mut(self.channels as usize)
-            .ok_or(MapFullError {})?) = position;
-        self.channels += 1;
-        Ok(())
+    /// Panics if the map already has CHANNEL_MAX channels.
+    pub fn push(&mut self, position: ChannelPosition) {
+        if self.channels < CHANNELS_MAX {
+            self.map[self.channels as usize] = position;
+            self.channels += 1;
+        } else {
+            panic!("channel map full");
+        }
     }
 
     /// Returns the number of channel mappings stored in this `ChannelMap`.
@@ -162,6 +179,56 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-/// An error indicating that a channel map is already full and cannot be extended.
-#[derive(Debug)]
-pub struct MapFullError {}
+impl TagStructRead for ChannelMap {
+    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+        ts.expect_tag(Tag::ChannelMap)?;
+
+        let channels = ts.inner.read_u8()?;
+        if channels > sample_spec::CHANNELS_MAX {
+            return Err(ProtocolError::Invalid(format!(
+                "channel map too large (max is {} channels, got {})",
+                sample_spec::CHANNELS_MAX,
+                channels
+            )));
+        }
+
+        let mut map = ChannelMap::empty();
+        for _ in 0..channels {
+            let raw = ts.inner.read_u8()?;
+            map.push(ChannelPosition::from_u8(raw).ok_or_else(|| {
+                ProtocolError::Invalid(format!("invalid channel position {}", raw))
+            })?)
+        }
+
+        Ok(map)
+    }
+}
+
+impl TagStructWrite for ChannelMap {
+    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+        w.inner.write_u8(Tag::ChannelMap as u8)?;
+        w.inner.write_u8(self.num_channels())?;
+        for channel_pos in self {
+            w.inner.write_u8(channel_pos as u8)?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::protocol::{test_util::test_serde_version, PROTOCOL_VERSION};
+
+    use super::*;
+
+    #[test]
+    fn roundtrip() -> anyhow::Result<()> {
+        let mut map = ChannelMap::empty();
+        map.push(ChannelPosition::FrontLeft);
+        map.push(ChannelPosition::FrontRight);
+        map.push(ChannelPosition::RearLeft);
+        map.push(ChannelPosition::RearRight);
+
+        test_serde_version(&map, PROTOCOL_VERSION)
+    }
+}

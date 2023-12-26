@@ -4,16 +4,16 @@ use enum_primitive_derive::Primitive;
 
 use num_traits::FromPrimitive;
 
+use super::*;
 use crate::protocol::ProtocolError;
 
-use super::Props;
-
 /// Describes how samples are encoded.
-#[derive(Debug, Copy, Clone, Primitive, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Primitive, PartialEq, Eq, Default)]
 pub enum FormatEncoding {
     /// Any encoding is supported.
     Any = 0,
     /// Good old PCM.
+    #[default]
     Pcm = 1,
     /// AC3 data encapsulated in IEC 61937 header/padding.
     Ac3Iec61937 = 2,
@@ -31,10 +31,10 @@ pub enum FormatEncoding {
 /// Sample encoding info.
 ///
 /// Associates a simple `FormatEncoding` with a list of arbitrary properties.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FormatInfo {
-    encoding: FormatEncoding,
-    props: Props,
+    pub encoding: FormatEncoding,
+    pub props: Props,
 }
 
 impl FormatInfo {
@@ -45,34 +45,38 @@ impl FormatInfo {
             props: Props::new(),
         }
     }
+}
 
-    /// Create a `FormatInfo` from raw data parsed from a tagstruct.
-    ///
-    /// # Parameters
-    ///
-    /// * `encoding`: Raw value for a `FormatEncoding`.
-    /// * `props`: Property list to associate with the `FormatInfo`.
-    pub fn from_raw(encoding: u8, props: Props) -> Result<Self, ProtocolError> {
+impl TagStructRead for FormatInfo {
+    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+        ts.expect_tag(Tag::FormatInfo)?;
+
+        let encoding = ts.read_u8()?;
         let encoding = FormatEncoding::from_u8(encoding).ok_or(ProtocolError::Invalid(format!(
-            "invalid encoding: {}",
+            "invalid format encoding: 0x{:2x}",
             encoding
         )))?;
-
+        let props = ts.read()?;
         Ok(Self { encoding, props })
     }
+}
 
-    /// Get the actual sample encoding.
-    pub fn encoding(&self) -> FormatEncoding {
-        self.encoding
+impl TagStructWrite for FormatInfo {
+    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+        w.inner.write_u8(Tag::FormatInfo as u8)?;
+        w.write_u8(self.encoding as u8)?;
+        w.write(&self.props)?;
+        Ok(())
     }
+}
 
-    /// Get a reference to the property list for this `FormatInfo` object.
-    pub fn props(&self) -> &Props {
-        &self.props
-    }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::test_util::test_serde;
 
-    /// Get a mutable reference to the property list for this `FormatInfo` object.
-    pub fn props_mut(&mut self) -> &mut Props {
-        &mut self.props
+    #[test]
+    fn format_info_serde() -> anyhow::Result<()> {
+        test_serde(&FormatInfo::new(FormatEncoding::Ac3Iec61937))
     }
 }

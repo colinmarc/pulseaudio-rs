@@ -2,6 +2,7 @@
 
 use enum_primitive_derive::Primitive;
 
+use super::*;
 use crate::protocol::ProtocolError;
 
 /// Maximum number of channels.
@@ -42,7 +43,7 @@ pub enum SampleFormat {
 }
 
 /// A sample specification that fully describes the format of a sample stream between 2 endpoints.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SampleSpec {
     /// Format / Encoding of individual samples.
     pub format: SampleFormat,
@@ -107,5 +108,50 @@ impl SampleSpec {
         }
 
         fixed
+    }
+}
+
+impl Default for SampleSpec {
+    fn default() -> Self {
+        Self {
+            format: SampleFormat::default(),
+            channels: 1,
+            sample_rate: 44100,
+        }
+    }
+}
+
+impl TagStructRead for SampleSpec {
+    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+        ts.expect_tag(Tag::SampleSpec)?;
+        let format = ts.inner.read_u8()?;
+        let format = SampleFormat::from_u8(format)
+            .ok_or_else(|| ProtocolError::Invalid(format!("invalid sample format {}", format)))?;
+        let channels = ts.inner.read_u8()?;
+        let sample_rate = ts.inner.read_u32::<NetworkEndian>()?;
+        Self::new(format, channels, sample_rate)
+    }
+}
+
+impl TagStructWrite for SampleSpec {
+    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+        w.inner.write_u8(Tag::SampleSpec as u8)?;
+        w.inner.write_u8(self.format as u8)?;
+        w.inner.write_u8(self.channels)?;
+        w.inner.write_u32::<NetworkEndian>(self.sample_rate)?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::protocol::test_util::test_serde;
+
+    use super::*;
+
+    #[test]
+    fn sample_spec_serde() -> anyhow::Result<()> {
+        let spec = SampleSpec::new(SampleFormat::S16Le, 2, 44100)?;
+        test_serde(&spec)
     }
 }

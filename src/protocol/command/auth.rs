@@ -80,12 +80,12 @@ impl TagStructWrite for AuthReply {
 
 #[cfg(test)]
 mod tests {
-    use crate::protocol::test_util::test_roundtrip;
+    use crate::protocol::serde::test_util::test_serde;
 
     use super::*;
 
     #[test]
-    fn test_auth_roundtrip() {
+    fn auth_serde() {
         let auth = Auth {
             version: 13,
             supports_shm: true,
@@ -93,6 +93,6 @@ mod tests {
             cookie: vec![1, 2, 3, 4],
         };
 
-        test_roundtrip(&auth).expect("roundtrip auth");
+        test_serde(&auth).expect("roundtrip auth");
     }
 }

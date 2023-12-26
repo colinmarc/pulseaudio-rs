@@ -1,11 +1,9 @@
 pub mod command;
 pub mod paths;
 pub mod serde;
-pub mod sink;
 pub mod stream;
 
 mod error;
-mod types;
 
 use std::io::{BufRead, Cursor, Read, Seek, SeekFrom, Write};
 
@@ -13,7 +11,7 @@ use bitflags::bitflags;
 use byteorder::NetworkEndian;
 pub use command::*;
 pub use error::*;
-pub use types::*;
+pub use serde::*;
 
 /// Minimum protocol version understood by the library.
 pub const PROTOCOL_MIN_VERSION: u16 = 13;
@@ -85,28 +83,6 @@ pub fn write_descriptor<W: Write>(w: &mut W, desc: Descriptor) -> Result<(), Pro
     Ok(())
 }
 
-pub fn read_reply_message<T: command::CommandReply>(
-    r: &mut impl BufRead,
-) -> Result<(u32, T), ProtocolError> {
-    let desc = read_descriptor(r)?;
-
-    let mut r = r.take(desc.length as u64);
-    let mut ts = serde::TagStructReader::new(&mut r, PROTOCOL_VERSION);
-    let (cmd, seq) = (ts.read_enum()?, ts.read_u32()?);
-
-    match cmd {
-        command::CommandTag::Error => {
-            let error = ts.read_enum()?;
-            Err(ProtocolError::ServerError(error))
-        }
-        command::CommandTag::Reply => Ok((seq, T::read(&mut ts, PROTOCOL_VERSION)?)),
-        _ => Err(ProtocolError::Invalid(format!(
-            "expected error, got {:?}",
-            cmd
-        ))),
-    }
-}
-
 /// Writes a command message to a buffer, and returns the number of bytes
 /// written.
 pub fn encode_command_message<T: AsRef<[u8]>>(
@@ -167,42 +143,69 @@ pub fn write_command_message<W: Write>(
     Ok(())
 }
 
-#[cfg(test)]
-pub mod test_util {
-    use super::serde::*;
-    use super::*;
-    use pretty_assertions::assert_eq;
+/// Read reply data from the server.
+pub fn read_reply_message<T: command::CommandReply>(
+    r: &mut impl BufRead,
+) -> Result<(u32, T), ProtocolError> {
+    let desc = read_descriptor(r)?;
 
-    pub fn test_roundtrip<T>(v: &T) -> Result<(), ProtocolError>
-    where
-        T: TagStructRead + TagStructWrite + PartialEq + std::fmt::Debug,
-        for<'a> &'a T: PartialEq,
-    {
-        for version in PROTOCOL_MIN_VERSION..PROTOCOL_VERSION {
-            test_roundtrip_version(v, version)?;
+    let mut r = r.take(desc.length as u64);
+    let mut ts = serde::TagStructReader::new(&mut r, PROTOCOL_VERSION);
+    let (cmd, seq) = (ts.read_enum()?, ts.read_u32()?);
+
+    match cmd {
+        command::CommandTag::Error => {
+            let error = ts.read_enum()?;
+            Err(ProtocolError::ServerError(error))
         }
-
-        Ok(())
+        command::CommandTag::Reply => Ok((seq, T::read(&mut ts, PROTOCOL_VERSION)?)),
+        _ => Err(ProtocolError::Invalid(format!(
+            "expected reply, got {:?}",
+            cmd
+        ))),
     }
+}
 
-    pub fn test_roundtrip_version<T>(v: &T, version: u16) -> Result<(), ProtocolError>
-    where
-        T: TagStructRead + TagStructWrite + std::fmt::Debug,
-        for<'a> &'a T: PartialEq,
-    {
-        let mut buf = Vec::new();
+/// Read an ack (an empty reply) from the server.
+pub fn read_ack_message(r: &mut impl BufRead) -> Result<u32, ProtocolError> {
+    let desc = read_descriptor(r)?;
 
-        {
-            let mut ts = TagStructWriter::new(&mut buf, version);
-            ts.write(v)?;
+    let mut r = r.take(desc.length as u64);
+    let mut ts = serde::TagStructReader::new(&mut r, PROTOCOL_VERSION);
+    let (cmd, seq) = (ts.read_enum()?, ts.read_u32()?);
+
+    match cmd {
+        command::CommandTag::Error => {
+            let error = ts.read_enum()?;
+            Err(ProtocolError::ServerError(error))
         }
+        command::CommandTag::Reply => Ok(seq),
+        _ => Err(ProtocolError::Invalid(format!(
+            "expected reply, got {:?}",
+            cmd
+        ))),
+    }
+}
 
-        let mut cursor = Cursor::new(buf);
-        let mut ts = TagStructReader::new(&mut cursor, version);
-        let v2 = T::read(&mut ts, version)?;
+/// Read a subscription event from the server.
+pub fn read_subscription_event(
+    r: &mut impl BufRead,
+) -> Result<(u32, SubscriptionEvent), ProtocolError> {
+    let desc = read_descriptor(r)?;
 
-        assert_eq!(v, &v2);
+    let mut r = r.take(desc.length as u64);
+    let mut ts = serde::TagStructReader::new(&mut r, PROTOCOL_VERSION);
+    let (cmd, seq) = (ts.read_enum()?, ts.read_u32()?);
 
-        Ok(())
+    match cmd {
+        command::CommandTag::Error => {
+            let error = ts.read_enum()?;
+            Err(ProtocolError::ServerError(error))
+        }
+        command::CommandTag::SubscribeEvent => Ok((seq, ts.read()?)),
+        _ => Err(ProtocolError::Invalid(format!(
+            "expected subscription event, got {:?}",
+            cmd
+        ))),
     }
 }

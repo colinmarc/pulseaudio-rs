@@ -6,6 +6,12 @@ use std::{
     ffi::{CStr, CString},
 };
 
+use super::*;
+use crate::protocol::ProtocolError;
+
+/// Max. size of a proplist value in Bytes.
+const MAX_PROP_SIZE: u32 = 64 * 1024;
+
 /// A list of key-value pairs that associate arbitrary properties with an object.
 ///
 /// This is a key-value mapping using UTF-8 strings as keys (specifically, ASCII keys). PulseAudio
@@ -410,5 +416,89 @@ impl Prop {
 impl From<Prop> for CString {
     fn from(prop: Prop) -> Self {
         CString::new(prop.as_str()).unwrap()
+    }
+}
+
+impl TagStructRead for Props {
+    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+        ts.expect_tag(Tag::PropList)?;
+
+        let mut props = Props::new();
+        while let Some(key) = ts.read_string()? {
+            if key.to_bytes().is_empty() {
+                return Err(ProtocolError::Invalid("proplist key is empty".into()));
+            }
+
+            let key = key
+                .to_str()
+                .map_err(|e| {
+                    ProtocolError::Invalid(format!("proplist key contains invalid utf-8: {}", e))
+                })?
+                .to_owned();
+
+            if !key.is_ascii() {
+                return Err(ProtocolError::Invalid(format!(
+                    "proplist key contains non-ASCII characters: {:?}",
+                    key
+                )));
+            }
+
+            let len = ts.read_u32()?;
+            if len > MAX_PROP_SIZE {
+                return Err(ProtocolError::Invalid(format!(
+                    "proplist value size {} exceeds hard limit of {} bytes",
+                    len, MAX_PROP_SIZE
+                )));
+            }
+
+            let value = ts.read_arbitrary()?;
+            if len != value.len() as u32 {
+                return Err(ProtocolError::Invalid(format!(
+                    "proplist expected value size {} does not match actual size {}",
+                    len,
+                    value.len()
+                )));
+            }
+
+            props.insert(key, value.into_boxed_slice());
+        }
+
+        Ok(props)
+    }
+}
+
+impl TagStructWrite for Props {
+    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+        w.inner.write_u8(Tag::PropList as u8)?;
+
+        for (k, v) in self.iter() {
+            let k = CString::new(k.as_bytes()).map_err(|_| {
+                ProtocolError::Invalid(format!("proplist key contains nul byte: {:?}", k))
+            })?;
+            assert!(v.len() < u32::MAX as usize);
+
+            w.write_string(Some(k))?;
+            w.write_u32(v.len() as u32)?;
+            w.write_arbitrary(v)?;
+        }
+
+        w.write_null_string()?;
+        Ok(())
+    }
+}
+#[cfg(test)]
+mod tests {
+    use crate::protocol::{test_util::test_serde_version, PROTOCOL_VERSION};
+
+    use super::*;
+
+    #[test]
+    fn props_serde() -> anyhow::Result<()> {
+        let mut proplist = Props::new();
+        proplist.insert("foo".into(), vec![1, 2, 3].into());
+        proplist.set(Prop::ApplicationName, "bar");
+
+        test_serde_version(&proplist, PROTOCOL_VERSION)?;
+        Ok(())
     }
 }

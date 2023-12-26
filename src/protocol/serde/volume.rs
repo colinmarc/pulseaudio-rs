@@ -3,7 +3,12 @@
 use std::slice;
 use std::{fmt, u32};
 
-use super::sample_spec::CHANNELS_MAX;
+use byteorder::NetworkEndian;
+
+use crate::protocol::ProtocolError;
+
+use super::sample_spec::{self, CHANNELS_MAX};
+use super::*;
 
 const VOLUME_NORM: u32 = 0x10000;
 const VOLUME_MUTED: u32 = 0;
@@ -83,6 +88,26 @@ impl fmt::Debug for Volume {
     }
 }
 
+impl TagStructRead for Volume {
+    fn read(
+        ts: &mut TagStructReader,
+        _protocol_version: u16,
+    ) -> Result<Self, super::ProtocolError> {
+        ts.expect_tag(super::Tag::Volume)?;
+        Ok(Volume::from_u32_clamped(
+            ts.inner.read_u32::<NetworkEndian>()?,
+        ))
+    }
+}
+
+impl TagStructWrite for Volume {
+    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+        w.inner.write_u8(Tag::Volume as u8)?;
+        w.inner.write_u32::<NetworkEndian>(self.as_u32())?;
+        Ok(())
+    }
+}
+
 /// Per-channel volume setting.
 #[derive(Clone, PartialEq, Eq)]
 pub struct ChannelVolume {
@@ -146,16 +171,67 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-/// An error returned by `CVolume::push`, indicating that the maximum number of channel has been
-/// reached.
-#[derive(Debug)]
-pub struct PushError {}
+impl TagStructRead for ChannelVolume {
+    fn read(
+        ts: &mut TagStructReader,
+        _protocol_version: u16,
+    ) -> Result<Self, super::ProtocolError> {
+        ts.expect_tag(super::Tag::CVolume)?;
+        let n_channels = ts.inner.read_u8()?;
+        if n_channels == 0 || n_channels > sample_spec::CHANNELS_MAX {
+            return Err(ProtocolError::Invalid(format!(
+                "invalid cvolume channel count {}, must be between 1 and {}",
+                n_channels,
+                sample_spec::CHANNELS_MAX
+            )));
+        }
+
+        let mut cvolume = ChannelVolume::empty();
+        for _ in 0..n_channels {
+            let raw = ts.inner.read_u32::<NetworkEndian>()?;
+            cvolume.push(Volume::from_u32_clamped(raw))
+        }
+
+        Ok(cvolume)
+    }
+}
+
+impl TagStructWrite for ChannelVolume {
+    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+        w.inner.write_u8(Tag::CVolume as u8)?;
+
+        w.inner.write_u8(self.channels().len() as u8)?;
+        for volume in self.channels() {
+            w.inner.write_u32::<NetworkEndian>(volume.as_u32())?;
+        }
+
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {
+    use crate::protocol::{test_util::test_serde_version, PROTOCOL_VERSION};
+
     use super::*;
 
     use std::f32;
+
+    #[test]
+    fn volume_serde() -> anyhow::Result<()> {
+        let v = Volume::from_linear(0.5);
+        test_serde_version(&v, PROTOCOL_VERSION)?;
+        Ok(())
+    }
+
+    #[test]
+    fn cvolume_serde() -> anyhow::Result<()> {
+        let mut cv = ChannelVolume::default();
+        cv.push(Volume::from_linear(0.5));
+        cv.push(Volume::from_linear(0.5));
+        test_serde_version(&cv, PROTOCOL_VERSION)?;
+        Ok(())
+    }
 
     #[test]
     fn volume_conversions() {

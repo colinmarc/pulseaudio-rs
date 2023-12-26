@@ -1,21 +1,33 @@
 use std::io::{BufRead, Write};
 
-use enum_primitive_derive::Primitive;
-
 mod auth;
 // mod create_playback_stream;
-mod get_info;
+mod client_info;
+mod module_info;
 mod register_memfd_shmid;
+mod sample_info;
 mod set_client_name;
+mod sink_info;
+mod sink_input_info;
+mod source_info;
+mod source_output_info;
+mod subscribe;
 
 pub use auth::{Auth, AuthReply};
-pub use get_info::SinkInfoList;
-// pub use create_playback_stream::CreatePlaybackStream;
+pub use client_info::*;
+pub use module_info::*;
 pub use register_memfd_shmid::RegisterMemfdShmid;
+pub use sample_info::*;
 pub use set_client_name::{SetClientName, SetClientNameReply};
+pub use sink_info::*;
+pub use sink_input_info::*;
+pub use source_info::*;
+pub use source_output_info::*;
+pub use subscribe::*;
 
 use super::{serde::*, ProtocolError, PulseError};
 
+use enum_primitive_derive::Primitive;
 use num_traits::FromPrimitive as _;
 
 #[repr(u8)]
@@ -213,16 +225,22 @@ pub enum Command {
 
     /// Create a new playback stream.
     // CreatePlaybackStream(CreatePlaybackStream<'a>),
-
-    // TODO: Payload for forwards-compatibility
+    GetServerInfo,
+    GetSinkInfo(GetSinkInfo),
     GetSinkInfoList,
+    GetSourceInfo(GetSourceInfo),
     GetSourceInfoList,
-    GetClientInfoList,
-    GetCardInfoList,
+    GetModuleInfo(u32),
     GetModuleInfoList,
+    GetClientInfo(u32),
+    GetClientInfoList,
+    GetSinkInputInfo(u32),
     GetSinkInputInfoList,
+    GetSourceOutputInfo(u32),
     GetSourceOutputInfoList,
+    GetSampleInfo(u32),
     GetSampleInfoList,
+    Subscribe(SubscriptionMask),
     // / Register `memfd`-based shared memory.
     // /
     // / This command can be sent from client to server and from server to
@@ -247,13 +265,20 @@ impl Command {
             CommandTag::Auth => Ok(Command::Auth(ts.read()?)),
             CommandTag::SetClientName => Ok(Command::SetClientName(ts.read()?)),
             // CommandTag::CreatePlaybackStream => Ok(Command::CreatePlaybackStream(TagStructRead::read(&mut crate::protocol::tagstruct::TagStructReader::new(r), 0)?)),
+            CommandTag::GetServerInfo => Ok(Command::GetServerInfo),
+            CommandTag::GetSinkInfo => Ok(Command::GetSinkInfo(ts.read()?)),
             CommandTag::GetSinkInfoList => Ok(Command::GetSinkInfoList),
+            CommandTag::GetSourceInfo => Ok(Command::GetSourceInfo(ts.read()?)),
             CommandTag::GetSourceInfoList => Ok(Command::GetSourceInfoList),
-            CommandTag::GetClientInfoList => Ok(Command::GetClientInfoList),
-            CommandTag::GetCardInfoList => Ok(Command::GetCardInfoList),
+            CommandTag::GetModuleInfo => Ok(Command::GetModuleInfo(ts.read_u32()?)),
             CommandTag::GetModuleInfoList => Ok(Command::GetModuleInfoList),
+            CommandTag::GetClientInfo => Ok(Command::GetClientInfo(ts.read_u32()?)),
+            CommandTag::GetClientInfoList => Ok(Command::GetClientInfoList),
+            CommandTag::GetSinkInputInfo => Ok(Command::GetSinkInputInfo(ts.read_u32()?)),
             CommandTag::GetSinkInputInfoList => Ok(Command::GetSinkInputInfoList),
+            CommandTag::GetSourceOutputInfo => Ok(Command::GetSourceOutputInfo(ts.read_u32()?)),
             CommandTag::GetSourceOutputInfoList => Ok(Command::GetSourceOutputInfoList),
+            CommandTag::GetSampleInfo => Ok(Command::GetSampleInfo(ts.read_u32()?)),
             CommandTag::GetSampleInfoList => Ok(Command::GetSampleInfoList),
             _ => Err(crate::protocol::ProtocolError::Unimplemented(command)),
         }?;
@@ -276,14 +301,23 @@ impl Command {
             Command::Auth(_) => CommandTag::Auth,
             Command::SetClientName(_) => CommandTag::SetClientName,
             // Command::CreatePlaybackStream(_) => CommandTag::CreatePlaybackStream,
+            Command::GetServerInfo => CommandTag::GetServerInfo,
+            Command::GetSinkInfo(_) => CommandTag::GetSinkInfo,
             Command::GetSinkInfoList => CommandTag::GetSinkInfoList,
+            Command::GetSourceInfo(_) => CommandTag::GetSourceInfo,
             Command::GetSourceInfoList => CommandTag::GetSourceInfoList,
+            Command::GetClientInfo(_) => CommandTag::GetClientInfo,
             Command::GetClientInfoList => CommandTag::GetClientInfoList,
-            Command::GetCardInfoList => CommandTag::GetCardInfoList,
+            // Command::GetCardInfoList => CommandTag::GetCardInfoList,
+            Command::GetModuleInfo(_) => CommandTag::GetModuleInfo,
             Command::GetModuleInfoList => CommandTag::GetModuleInfoList,
+            Command::GetSinkInputInfo(_) => CommandTag::GetSinkInputInfo,
             Command::GetSinkInputInfoList => CommandTag::GetSinkInputInfoList,
+            Command::GetSourceOutputInfo(_) => CommandTag::GetSourceOutputInfo,
             Command::GetSourceOutputInfoList => CommandTag::GetSourceOutputInfoList,
+            Command::GetSampleInfo(_) => CommandTag::GetSampleInfo,
             Command::GetSampleInfoList => CommandTag::GetSampleInfoList,
+            Command::Subscribe(_) => CommandTag::Subscribe,
         }
     }
 }
@@ -297,11 +331,19 @@ impl TagStructWrite for Command {
         match self {
             Command::Auth(ref p) => w.write(p),
             Command::SetClientName(ref p) => w.write(p),
-            Command::GetSinkInfoList
+            Command::GetSinkInfo(ref p) => w.write(p),
+            Command::GetSourceInfo(ref p) => w.write(p),
+            Command::GetModuleInfo(id) => w.write_u32(*id),
+            Command::GetClientInfo(id) => w.write_u32(*id),
+            Command::GetSinkInputInfo(id) => w.write_u32(*id),
+            Command::GetSourceOutputInfo(id) => w.write_u32(*id),
+            Command::GetSampleInfo(id) => w.write_u32(*id),
+            Command::Subscribe(mask) => w.write(mask),
+            Command::GetServerInfo
+            | Command::GetSinkInfoList
             | Command::GetSourceInfoList
-            | Command::GetClientInfoList
-            | Command::GetCardInfoList
             | Command::GetModuleInfoList
+            | Command::GetClientInfoList
             | Command::GetSinkInputInfoList
             | Command::GetSourceOutputInfoList
             | Command::GetSampleInfoList => Ok(()),

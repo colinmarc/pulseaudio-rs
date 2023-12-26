@@ -1,0 +1,6 @@
+{
+    "rust-analyzer.cargo.features": [
+        "_integration-tests"
+    ],
+    "rust-analyzer.showUnlinkedFileNotification": false
+}

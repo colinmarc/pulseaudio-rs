@@ -12,7 +12,7 @@ impl TagStructRead for SetClientName {
     fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
         // before protocol version 13, *only* the client name was transferred (as a string)
         // proto>=13
-        let props = ts.read_proplist()?;
+        let props = ts.read()?;
         Ok(Self { props })
     }
 }
