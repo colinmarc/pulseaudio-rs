@@ -1,7 +1,5 @@
 pub mod command;
-pub mod paths;
 pub mod serde;
-pub mod stream;
 
 mod error;
 
@@ -26,7 +24,7 @@ const DESCRIPTOR_SIZE: usize = 5 * 4;
 
 bitflags! {
     /// Special message types.
-    #[derive(Debug, Default, Clone)]
+    #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
     pub struct DescriptorFlags: u32 {
         const FLAG_SHMRELEASE = 0x40000000; // 0b0100
         const FLAG_SHMREVOKE = 0xC0000000; // 0b1100 FIXME 2 bits set?

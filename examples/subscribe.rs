@@ -22,14 +22,14 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cookie_path = Path::new(&home).join(".pulse-cookie");
     let auth = if cookie_path.exists() {
         let cookie = std::fs::read(&cookie_path)?;
-        protocol::Auth {
+        protocol::AuthParams {
             version: protocol::PROTOCOL_VERSION,
             supports_shm: false,
             supports_memfd: false,
-            cookie: cookie,
+            cookie,
         }
     } else {
-        protocol::Auth {
+        protocol::AuthParams {
             version: protocol::PROTOCOL_VERSION,
             supports_shm: false,
             supports_memfd: false,
@@ -44,11 +44,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The next step is to set the client name.
     let mut props = protocol::Props::new();
     props.set(protocol::Prop::ApplicationName, "list-sinks");
-    protocol::write_command_message(
-        sock.get_mut(),
-        1,
-        protocol::Command::SetClientName(protocol::SetClientName { props }),
-    )?;
+    protocol::write_command_message(sock.get_mut(), 1, protocol::Command::SetClientName(props))?;
     let _ = protocol::read_reply_message::<protocol::SetClientNameReply>(&mut sock)?;
 
     // Finally, write a command to create a subscription. The mask we pass will

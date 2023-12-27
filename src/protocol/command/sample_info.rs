@@ -5,7 +5,7 @@ use crate::protocol::{serde::*, ProtocolError};
 use super::CommandReply;
 
 /// Represents a single sample cache entry.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct SampleInfo {
     /// The ID of the sample cache entry.
     pub index: u32,
@@ -73,7 +73,7 @@ impl TagStructWrite for SampleInfo {
         w.write_string(Some(&self.name))?;
         w.write(&self.cvolume)?;
         w.write_usec(self.duration)?;
-        w.write(&self.sample_spec)?;
+        w.write(self.sample_spec)?;
         w.write(&self.channel_map)?;
         w.write_u32(self.length)?;
         w.write_bool(self.lazy.is_some())?;
@@ -144,7 +144,7 @@ mod integration_tests {
         assert_eq!(seq, 0);
 
         // The list is often empty.
-        if info_list.len() == 0 {
+        if info_list.is_empty() {
             return Ok(());
         }
 

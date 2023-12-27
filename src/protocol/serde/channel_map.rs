@@ -9,7 +9,7 @@ use crate::protocol::ProtocolError;
 use enum_primitive_derive::Primitive;
 
 /// Channel position labels.
-#[derive(Debug, Copy, Clone, Primitive, PartialEq, Eq, Default)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum ChannelPosition {
     #[default]
     Mono = 0,

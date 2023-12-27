@@ -41,7 +41,7 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Primitive, Default)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum SinkState {
     /// Sink is playing samples: The sink is used by at least one non-paused input.
     Running = 0,
@@ -62,12 +62,11 @@ pub enum Direction {
     Output,
 }
 
-/// Port availability / jack detection status.
-/// \since 2.0
-// TODO: Clarify if this means "port available for playback/recording"
-#[derive(Debug, Copy, Clone, Primitive, PartialEq, Eq)]
+/// Port availability status.
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum PortAvailable {
     /// This port does not support jack detection.
+    #[default]
     Unknown = 0,
     /// This port is not available, likely because the jack is not plugged in. \since 2.0
     No = 1,
@@ -76,7 +75,7 @@ pub enum PortAvailable {
 }
 
 /// A port on a sink or source.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PortInfo {
     pub name: CString,
     pub description: Option<CString>,
@@ -92,7 +91,7 @@ pub struct PortInfo {
 ///
 /// A sink always has a single configured sample spec, and all sink inputs are converted to that
 /// format (using resampling to match the sample rates, if necessary).
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct SinkInfo {
     /// Server-internal sink ID.
     pub index: u32,
@@ -428,7 +427,7 @@ mod integration_tests {
 
         write_command_message(sock.get_mut(), 0, Command::GetSinkInfoList)?;
         let (_, info_list) = read_reply_message::<SinkInfoList>(&mut sock)?;
-        assert!(info_list.len() > 0);
+        assert!(!info_list.is_empty());
 
         Ok(())
     }

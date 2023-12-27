@@ -4,8 +4,8 @@ mod auth;
 // mod create_playback_stream;
 mod client_info;
 mod module_info;
-mod register_memfd_shmid;
 mod sample_info;
+mod server_info;
 mod set_client_name;
 mod sink_info;
 mod sink_input_info;
@@ -13,12 +13,12 @@ mod source_info;
 mod source_output_info;
 mod subscribe;
 
-pub use auth::{Auth, AuthReply};
+pub use auth::{AuthParams, AuthReply};
 pub use client_info::*;
 pub use module_info::*;
-pub use register_memfd_shmid::RegisterMemfdShmid;
 pub use sample_info::*;
-pub use set_client_name::{SetClientName, SetClientNameReply};
+pub use server_info::*;
+pub use set_client_name::*;
 pub use sink_info::*;
 pub use sink_input_info::*;
 pub use source_info::*;
@@ -31,7 +31,7 @@ use enum_primitive_derive::Primitive;
 use num_traits::FromPrimitive as _;
 
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, Primitive)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum CommandTag {
     /* Generic commands */
     Error = 0,
@@ -188,7 +188,6 @@ pub enum CommandTag {
     /* Supported since protocol v31 (9.0)
      * BOTH DIRECTIONS */
     RegisterMemfdShmid = 103,
-    //PA_COMMAND_MAX,
 }
 
 impl TagStructRead for CommandTag {
@@ -218,10 +217,10 @@ pub struct CommandError {
 #[derive(Debug)]
 pub enum Command {
     /// Authentication request (and protocol handshake).
-    Auth(auth::Auth),
+    Auth(AuthParams),
 
     /// Updates client properties (not just the name).
-    SetClientName(SetClientName),
+    SetClientName(Props),
 
     /// Create a new playback stream.
     // CreatePlaybackStream(CreatePlaybackStream<'a>),

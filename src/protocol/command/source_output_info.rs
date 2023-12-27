@@ -3,7 +3,7 @@ use std::ffi::CString;
 use super::CommandReply;
 use crate::protocol::{serde::*, ProtocolError};
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct SourceOutputInfo {
     /// ID of the source output.
     pub index: u32,
@@ -105,7 +105,7 @@ impl TagStructWrite for SourceOutputInfo {
         w.write_index(self.owner_module_index)?;
         w.write_index(self.client_index)?;
         w.write_u32(self.source_index)?;
-        w.write(&self.sample_spec)?;
+        w.write(self.sample_spec)?;
         w.write(&self.channel_map)?;
         w.write_usec(self.buffer_latency)?;
         w.write_usec(self.source_latency)?;
@@ -191,7 +191,7 @@ mod integration_tests {
         assert_eq!(seq, 0);
 
         // The list is often empty.
-        if info_list.len() == 0 {
+        if info_list.is_empty() {
             return Ok(());
         }
 

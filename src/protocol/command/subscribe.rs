@@ -6,7 +6,7 @@ use crate::protocol::{serde::*, ProtocolError};
 use super::CommandReply;
 
 bitflags! {
-    #[derive(Default, Eq, PartialEq, Copy, Clone, Hash, Debug)]
+    #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
     pub struct SubscriptionMask: u32 {
         /// Sink events.
         const SINK = 0x0001;
@@ -57,7 +57,7 @@ impl TagStructWrite for SubscriptionMask {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Primitive)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum SubscriptionEventFacility {
     Sink = 0,
     Source = 1,
@@ -71,11 +71,11 @@ pub enum SubscriptionEventFacility {
     Card = 9,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Primitive)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum SubscriptionEventType {
     New = 0x00,
-    Change = 0x20,
-    Remove = 0x30,
+    Changed = 0x20,
+    Removed = 0x30,
 }
 
 const FACILITY_MASK: u32 = 0x0F;

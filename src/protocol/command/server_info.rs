@@ -1,4 +1,10 @@
-#[derive(Debug, Default, Clone, PartialEq)]
+use std::ffi::CString;
+
+use crate::protocol::{serde::*, ProtocolError};
+
+use super::CommandReply;
+
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct ServerInfo {
     /// Server "package name" (usually "pulseaudio")
     server_name: Option<CString>,
@@ -37,7 +43,7 @@ impl TagStructRead for ServerInfo {
             server_version: ts.read_string()?,
             user_name: ts.read_string()?,
             host_name: ts.read_string()?,
-            sample_spec: ts.read_sample_spec()?,
+            sample_spec: ts.read()?,
             default_sink_name: ts.read_string()?,
             default_source_name: ts.read_string()?,
             cookie: ts.read_u32()?,
@@ -45,7 +51,7 @@ impl TagStructRead for ServerInfo {
         };
 
         if protocol_version >= 15 {
-            info.channel_map = ts.read_channel_map()?;
+            info.channel_map = ts.read()?;
         }
 
         Ok(info)
@@ -58,7 +64,7 @@ impl TagStructWrite for ServerInfo {
         w.write_string(self.server_version.as_ref())?;
         w.write_string(self.user_name.as_ref())?;
         w.write_string(self.host_name.as_ref())?;
-        w.write(&self.sample_spec)?;
+        w.write(self.sample_spec)?;
         w.write_string(self.default_sink_name.as_ref())?;
         w.write_string(self.default_source_name.as_ref())?;
         w.write_u32(self.cookie)?;
@@ -69,8 +75,12 @@ impl TagStructWrite for ServerInfo {
 
 #[cfg(test)]
 mod tests {
+    use crate::protocol::test_util::test_serde;
+
+    use super::*;
+
     #[test]
-    fn server_info_serde() {
+    fn server_info_serde() -> anyhow::Result<()> {
         let info = ServerInfo {
             server_name: Some(CString::new("foo").unwrap()),
             server_version: Some(CString::new("bar").unwrap()),
@@ -83,13 +93,15 @@ mod tests {
             channel_map: ChannelMap::default(),
         };
 
-        test_serde(&info).expect("ServerInfo roundtrip")
+        test_serde(&info)
     }
 }
 
 #[cfg(test)]
 #[cfg(feature = "_integration-tests")]
 mod integration_tests {
+    use crate::{integration_test_util::connect_and_init, protocol::*};
+
     #[test]
     fn get_server_info() -> Result<(), Box<dyn std::error::Error>> {
         let mut sock = connect_and_init()?;

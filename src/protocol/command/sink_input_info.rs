@@ -3,7 +3,7 @@ use std::ffi::CString;
 use super::CommandReply;
 use crate::protocol::{serde::*, ProtocolError};
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct SinkInputInfo {
     /// ID of the sink input.
     pub index: u32,
@@ -197,7 +197,7 @@ mod integration_tests {
         assert_eq!(seq, 0);
 
         // The list is often empty.
-        if info_list.len() == 0 {
+        if info_list.is_empty() {
             return Ok(());
         }
 

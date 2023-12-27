@@ -10,16 +10,16 @@ mod integration_test_util {
     pub fn connect_to_server() -> anyhow::Result<BufReader<UnixStream>> {
         let xdg_runtime_dir = std::env::var("XDG_RUNTIME_DIR")?;
         let socket_path = std::path::Path::new(&xdg_runtime_dir).join("pulse/native");
-        let sock = UnixStream::connect(&socket_path)?;
+        let sock = UnixStream::connect(socket_path)?;
 
         Ok(BufReader::new(sock))
     }
 
     pub fn init_client(mut sock: &mut BufReader<UnixStream>) -> anyhow::Result<()> {
         let cookie_path = std::path::Path::new(&std::env::var("HOME")?).join(".pulse-cookie");
-        let cookie = std::fs::read(&cookie_path)?;
+        let cookie = std::fs::read(cookie_path)?;
 
-        let auth = Auth {
+        let auth = AuthParams {
             version: PROTOCOL_VERSION,
             supports_shm: false,
             supports_memfd: false,
@@ -31,11 +31,7 @@ mod integration_test_util {
 
         let mut props = Props::new();
         props.set(Prop::ApplicationName, "pulseaudio-rs-tests");
-        write_command_message(
-            sock.get_mut(),
-            1,
-            Command::SetClientName(SetClientName { props }),
-        )?;
+        write_command_message(sock.get_mut(), 1, Command::SetClientName(props))?;
         let _ = read_reply_message::<SetClientNameReply>(&mut sock)?;
 
         Ok(())

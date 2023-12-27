@@ -8,16 +8,19 @@ const VERSION_MASK: u32 = 0x0000ffff;
 pub const FLAG_SHM: u32 = 0x80000000;
 pub const FLAG_MEMFD: u32 = 0x40000000;
 
-/// Establish connection and authenticate client.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Auth {
+/// The auth command is the first message a client should send on connection.
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct AuthParams {
     pub version: u16,
+    /// Whether the client supports shared memory memblocks.
     pub supports_shm: bool,
+    /// Whether the client supports memfd memblocks.
     pub supports_memfd: bool,
+    /// A password-like blob, usually created by the server at ~/.pulse-cookie.
     pub cookie: Vec<u8>,
 }
 
-impl TagStructRead for Auth {
+impl TagStructRead for AuthParams {
     fn read(ts: &mut TagStructReader, _version: u16) -> Result<Self, ProtocolError> {
         let (flags_and_version, cookie) = (ts.read_u32()?, ts.read_arbitrary()?);
 
@@ -30,7 +33,7 @@ impl TagStructRead for Auth {
     }
 }
 
-impl TagStructWrite for Auth {
+impl TagStructWrite for AuthParams {
     fn write(&self, w: &mut TagStructWriter, _version: u16) -> Result<(), ProtocolError> {
         let flags_and_version: u32 = (self.version as u32 & VERSION_MASK)
             | if self.supports_shm { FLAG_SHM } else { 0 }
@@ -86,7 +89,7 @@ mod tests {
 
     #[test]
     fn auth_serde() {
-        let auth = Auth {
+        let auth = AuthParams {
             version: 13,
             supports_shm: true,
             supports_memfd: false,

@@ -8,7 +8,7 @@ use super::*;
 use crate::protocol::ProtocolError;
 
 /// Describes how samples are encoded.
-#[derive(Debug, Copy, Clone, Primitive, PartialEq, Eq, Default)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum FormatEncoding {
     /// Any encoding is supported.
     Any = 0,

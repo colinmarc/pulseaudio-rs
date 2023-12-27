@@ -26,7 +26,7 @@ use std::time;
 
 #[allow(bad_style)]
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, Primitive, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum Tag {
     String = b't',
     StringNull = b'N',
@@ -364,12 +364,6 @@ where
     }
 }
 
-// impl TagStructWrite for Value {
-//     fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
-//         w.write_value(self)
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
@@ -449,7 +443,7 @@ pub mod test_util {
         let mut ts = TagStructReader::new(&mut cursor, version);
         let v2 = T::read(&mut ts, version)?;
 
-        assert_eq!(v, &v2);
+        assert_eq!(v, &v2, "roundtrip failed for protocol version {}", version);
 
         Ok(())
     }

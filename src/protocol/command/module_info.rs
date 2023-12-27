@@ -4,7 +4,7 @@ use crate::protocol::{serde::*, ProtocolError};
 
 use super::CommandReply;
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct ModuleInfo {
     /// ID of the module.
     pub index: u32,
@@ -136,7 +136,7 @@ mod integration_tests {
         write_command_message(sock.get_mut(), 0, Command::GetModuleInfoList)?;
         let (seq, info_list) = read_reply_message::<ModuleInfoList>(&mut sock)?;
         assert_eq!(seq, 0);
-        assert!(info_list.len() > 0);
+        assert!(!info_list.is_empty());
 
         write_command_message(
             sock.get_mut(),

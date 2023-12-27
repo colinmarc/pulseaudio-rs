@@ -4,7 +4,7 @@ use enum_primitive_derive::Primitive;
 
 use crate::protocol::{serde::*, *};
 
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Primitive)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Primitive)]
 pub enum SourceState {
     /// The source is recording and used by at least one non-corked source-output.
     Running = 0,
@@ -45,7 +45,7 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct SourceInfo {
     /// The server-internal source ID.
     pub index: u32,
@@ -339,7 +339,7 @@ mod integration_tests {
         write_command_message(sock.get_mut(), 0, Command::GetSourceInfoList)?;
         let (seq, info_list) = read_reply_message::<SourceInfoList>(&mut sock)?;
         assert_eq!(seq, 0);
-        assert!(info_list.len() > 0);
+        assert!(!info_list.is_empty());
 
         write_command_message(
             sock.get_mut(),
