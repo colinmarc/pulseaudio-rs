@@ -96,6 +96,8 @@ impl TagStructWrite for PlaybackLatency {
         w.write_timeval(self.remote_time)?;
         w.write_i64(self.write_offset)?;
         w.write_i64(self.read_offset)?;
+        w.write_u64(self.underrun_for)?;
+        w.write_u64(self.playing_for)?;
         Ok(())
     }
 }
