@@ -211,7 +211,7 @@ impl TagStructWrite for ChannelVolume {
 
 #[cfg(test)]
 mod tests {
-    use crate::protocol::{test_util::test_serde_version, PROTOCOL_VERSION};
+    use crate::protocol::{test_util::test_serde_version, MAX_VERSION};
 
     use super::*;
 
@@ -220,7 +220,7 @@ mod tests {
     #[test]
     fn volume_serde() -> anyhow::Result<()> {
         let v = Volume::from_linear(0.5);
-        test_serde_version(&v, PROTOCOL_VERSION)?;
+        test_serde_version(&v, MAX_VERSION)?;
         Ok(())
     }
 
@@ -229,7 +229,7 @@ mod tests {
         let mut cv = ChannelVolume::default();
         cv.push(Volume::from_linear(0.5));
         cv.push(Volume::from_linear(0.5));
-        test_serde_version(&cv, PROTOCOL_VERSION)?;
+        test_serde_version(&cv, MAX_VERSION)?;
         Ok(())
     }
 

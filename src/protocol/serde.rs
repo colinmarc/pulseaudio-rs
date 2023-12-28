@@ -1,12 +1,10 @@
-//! A "tagstruct" is PulseAudio's central IPC data structure.
-//!
-//! A tagstruct is a sequence of type-tagged `Value`s. This module provides parsers for the format
-//! and writers to easily create tagstruct byte streams.
+//! Provides helpers for converting IPC types to and from raw byte streams.
 
 pub mod channel_map;
 pub mod format_info;
 pub mod props;
 pub mod sample_spec;
+pub mod stream;
 pub mod volume;
 
 pub use channel_map::{ChannelMap, ChannelPosition};
@@ -408,7 +406,7 @@ mod tests {
 #[cfg(test)]
 pub mod test_util {
     use super::*;
-    use crate::protocol::{PROTOCOL_MIN_VERSION, PROTOCOL_VERSION};
+    use crate::protocol::{MAX_VERSION, MIN_VERSION};
 
     use anyhow::Context as _;
     use pretty_assertions::assert_eq;
@@ -419,7 +417,7 @@ pub mod test_util {
         T: TagStructRead + TagStructWrite + PartialEq + std::fmt::Debug,
         for<'a> &'a T: PartialEq,
     {
-        for version in PROTOCOL_MIN_VERSION..PROTOCOL_VERSION {
+        for version in MIN_VERSION..MAX_VERSION {
             test_serde_version(v, version)
                 .context(format!("roundtrip failed for protocol version {}", version))?;
         }

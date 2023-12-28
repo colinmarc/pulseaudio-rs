@@ -7,31 +7,31 @@ use super::CommandReply;
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct ServerInfo {
     /// Server "package name" (usually "pulseaudio")
-    server_name: Option<CString>,
+    pub server_name: Option<CString>,
 
     /// Version string of the daemon.
-    server_version: Option<CString>,
+    pub server_version: Option<CString>,
 
     /// User name of the daemon process.
-    user_name: Option<CString>,
+    pub user_name: Option<CString>,
 
     /// Host name the daemon is running on.
-    host_name: Option<CString>,
+    pub host_name: Option<CString>,
 
     /// Default sample specification.
-    sample_spec: SampleSpec,
+    pub sample_spec: SampleSpec,
 
     /// A random ID to indentify the server.
-    cookie: u32,
+    pub cookie: u32,
 
     /// Name of the current default sink.
-    default_sink_name: Option<CString>,
+    pub default_sink_name: Option<CString>,
 
     /// Name of the current default source.
-    default_source_name: Option<CString>,
+    pub default_source_name: Option<CString>,
 
     /// Channel map for the default sink.
-    channel_map: ChannelMap,
+    pub channel_map: ChannelMap,
 }
 
 impl CommandReply for ServerInfo {}

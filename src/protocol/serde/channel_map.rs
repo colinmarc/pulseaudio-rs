@@ -217,7 +217,7 @@ impl TagStructWrite for ChannelMap {
 
 #[cfg(test)]
 mod tests {
-    use crate::protocol::{test_util::test_serde_version, PROTOCOL_VERSION};
+    use crate::protocol::{test_util::test_serde_version, MAX_VERSION};
 
     use super::*;
 
@@ -229,6 +229,6 @@ mod tests {
         map.push(ChannelPosition::RearLeft);
         map.push(ChannelPosition::RearRight);
 
-        test_serde_version(&map, PROTOCOL_VERSION)
+        test_serde_version(&map, MAX_VERSION)
     }
 }

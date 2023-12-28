@@ -1,4 +1,4 @@
-//! Defines the `PropList` type, a key-value map that is used to associate arbitrary properties with
+//! Defines the [`Props`] type, a key-value map that is used to associate arbitrary properties with
 //! objects.
 
 use std::{
@@ -488,7 +488,7 @@ impl TagStructWrite for Props {
 }
 #[cfg(test)]
 mod tests {
-    use crate::protocol::{test_util::test_serde_version, PROTOCOL_VERSION};
+    use crate::protocol::{test_util::test_serde_version, MAX_VERSION};
 
     use super::*;
 
@@ -498,7 +498,7 @@ mod tests {
         proplist.insert("foo".into(), vec![1, 2, 3].into());
         proplist.set(Prop::ApplicationName, "bar");
 
-        test_serde_version(&proplist, PROTOCOL_VERSION)?;
+        test_serde_version(&proplist, MAX_VERSION)?;
         Ok(())
     }
 }

@@ -20,7 +20,7 @@ mod integration_test_util {
         let cookie = std::fs::read(cookie_path)?;
 
         let auth = AuthParams {
-            version: PROTOCOL_VERSION,
+            version: MAX_VERSION,
             supports_shm: false,
             supports_memfd: false,
             cookie,

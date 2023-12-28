@@ -3,8 +3,6 @@ use enum_primitive_derive::Primitive;
 
 use crate::protocol::{serde::*, ProtocolError};
 
-use super::CommandReply;
-
 bitflags! {
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
     pub struct SubscriptionMask: u32 {
@@ -91,8 +89,6 @@ pub struct SubscriptionEvent {
     pub index: Option<u32>,
 }
 
-impl CommandReply for SubscriptionEvent {}
-
 impl TagStructRead for SubscriptionEvent {
     fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
         use num_traits::FromPrimitive as _;
@@ -124,12 +120,12 @@ impl TagStructWrite for SubscriptionEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::{test_util::test_serde_version, PROTOCOL_VERSION};
+    use crate::protocol::{test_util::test_serde_version, MAX_VERSION};
 
     #[test]
     fn subscription_mask_serde() -> anyhow::Result<()> {
         let mask = SubscriptionMask::SINK | SubscriptionMask::SOURCE;
-        test_serde_version(&mask, PROTOCOL_VERSION)
+        test_serde_version(&mask, MAX_VERSION)
     }
 
     #[test]
@@ -139,7 +135,7 @@ mod tests {
             event_type: SubscriptionEventType::New,
             index: Some(1),
         };
-        test_serde_version(&event, PROTOCOL_VERSION)
+        test_serde_version(&event, MAX_VERSION)
     }
 }
 

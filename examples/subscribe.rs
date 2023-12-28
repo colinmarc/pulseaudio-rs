@@ -23,14 +23,14 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     let auth = if cookie_path.exists() {
         let cookie = std::fs::read(&cookie_path)?;
         protocol::AuthParams {
-            version: protocol::PROTOCOL_VERSION,
+            version: protocol::MAX_VERSION,
             supports_shm: false,
             supports_memfd: false,
             cookie,
         }
     } else {
         protocol::AuthParams {
-            version: protocol::PROTOCOL_VERSION,
+            version: protocol::MAX_VERSION,
             supports_shm: false,
             supports_memfd: false,
             cookie: Vec::new(),

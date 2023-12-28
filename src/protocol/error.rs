@@ -5,18 +5,30 @@ use thiserror::Error;
 
 use super::command::CommandTag;
 
+/// A generic protocol error.
 #[derive(Error, Debug)]
 pub enum ProtocolError {
+    /// The version is not supported by this library.
     #[error("unsupported protocol version: {0}")]
     UnsupportedVersion(u16),
+    /// A command other than what we were expecting was received.
+    #[error("unexpected command: {0:?}")]
+    UnexpectedCommand(CommandTag),
+    /// The message is invalid.
     #[error("invalid IPC message: {0}")]
     Invalid(String),
+    /// An I/O error occurred, such as an unexpected EOF while reading a tagstruct.
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+    /// The command is not yet implemented.
     #[error("unimplemented command: {0:?}")]
     Unimplemented(CommandTag),
+    /// An error from a remote server.
     #[error("server error: {0:?}")]
     ServerError(PulseError),
+    /// The server disconnected.
+    #[error("timeout received from server")]
+    Timeout,
 }
 
 /// An error code understood by the PulseAudio protocol.

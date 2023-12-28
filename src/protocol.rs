@@ -1,3 +1,5 @@
+//! An implementation of the PulseAudio IPC protocol.
+
 pub mod command;
 pub mod serde;
 
@@ -12,13 +14,13 @@ pub use error::*;
 pub use serde::*;
 
 /// Minimum protocol version understood by the library.
-pub const PROTOCOL_MIN_VERSION: u16 = 13;
+pub const MIN_VERSION: u16 = 13;
 
 /// PulseAudio protocol version implemented by this library.
 ///
 /// This library can still work with clients and servers down to `PROTOCOL_MIN_VERSION` and up to
 /// any higher version, but features added by versions higher than this are not supported.
-pub const PROTOCOL_VERSION: u16 = 32;
+pub const MAX_VERSION: u16 = 32;
 
 const DESCRIPTOR_SIZE: usize = 5 * 4;
 
@@ -64,12 +66,15 @@ pub fn read_descriptor<R: Read>(r: &mut R) -> Result<Descriptor, ProtocolError> 
     })
 }
 
+/// Reads a command message from an input stream. If the result is
+/// [`Command::Reply`], then the payload is command-specific and must be read
+/// immediately afterwards.
 pub fn read_command_message<R: BufRead>(r: &mut R) -> Result<(u32, Command), ProtocolError> {
     let desc = read_descriptor(r)?;
-    Command::read_tag_prefixed(&mut r.take(desc.length as u64), PROTOCOL_VERSION)
+    Command::read_tag_prefixed(&mut r.take(desc.length as u64), MAX_VERSION)
 }
 
-/// Write a message header to an output stream.
+/// Writes a message header to an output stream.
 pub fn write_descriptor<W: Write>(w: &mut W, desc: Descriptor) -> Result<(), ProtocolError> {
     use byteorder::WriteBytesExt;
 
@@ -94,7 +99,7 @@ where
     let mut cursor = Cursor::new(buf);
     cursor.seek(SeekFrom::Start(DESCRIPTOR_SIZE as u64))?;
 
-    command.write_tag_prefixed(seq, &mut cursor)?;
+    command.write_tag_prefixed(seq, &mut cursor, MAX_VERSION)?;
     let length = (cursor.position() - DESCRIPTOR_SIZE as u64)
         .try_into()
         .map_err(|_| ProtocolError::Invalid("message payload greater than 4gb".to_string()))?;
@@ -112,7 +117,7 @@ where
     Ok(cursor.position() as usize)
 }
 
-/// Write a command message to an output stream. This will allocate a temporary
+/// Writes a command message to an output stream. This will allocate a temporary
 /// buffer to encode the command. To avoid the extra copy, use
 /// [`encode_command_message`].
 pub fn write_command_message<W: Write>(
@@ -121,7 +126,7 @@ pub fn write_command_message<W: Write>(
     command: Command,
 ) -> Result<(), ProtocolError> {
     let mut buf = Cursor::new(Vec::new());
-    command.write_tag_prefixed(seq, &mut buf)?;
+    command.write_tag_prefixed(seq, &mut buf, MAX_VERSION)?;
 
     let length = buf
         .position()
@@ -141,14 +146,14 @@ pub fn write_command_message<W: Write>(
     Ok(())
 }
 
-/// Read reply data from the server.
+/// Reads reply data from the server.
 pub fn read_reply_message<T: command::CommandReply>(
     r: &mut impl BufRead,
 ) -> Result<(u32, T), ProtocolError> {
     let desc = read_descriptor(r)?;
 
     let mut r = r.take(desc.length as u64);
-    let mut ts = serde::TagStructReader::new(&mut r, PROTOCOL_VERSION);
+    let mut ts = serde::TagStructReader::new(&mut r, MAX_VERSION);
     let (cmd, seq) = (ts.read_enum()?, ts.read_u32()?);
 
     match cmd {
@@ -156,20 +161,17 @@ pub fn read_reply_message<T: command::CommandReply>(
             let error = ts.read_enum()?;
             Err(ProtocolError::ServerError(error))
         }
-        command::CommandTag::Reply => Ok((seq, T::read(&mut ts, PROTOCOL_VERSION)?)),
-        _ => Err(ProtocolError::Invalid(format!(
-            "expected reply, got {:?}",
-            cmd
-        ))),
+        command::CommandTag::Reply => Ok((seq, T::read(&mut ts, MAX_VERSION)?)),
+        _ => Err(ProtocolError::UnexpectedCommand(cmd)),
     }
 }
 
-/// Read an ack (an empty reply) from the server.
+/// Reads an ack (an empty reply) from the server.
 pub fn read_ack_message(r: &mut impl BufRead) -> Result<u32, ProtocolError> {
     let desc = read_descriptor(r)?;
 
     let mut r = r.take(desc.length as u64);
-    let mut ts = serde::TagStructReader::new(&mut r, PROTOCOL_VERSION);
+    let mut ts = serde::TagStructReader::new(&mut r, MAX_VERSION);
     let (cmd, seq) = (ts.read_enum()?, ts.read_u32()?);
 
     match cmd {
@@ -185,14 +187,14 @@ pub fn read_ack_message(r: &mut impl BufRead) -> Result<u32, ProtocolError> {
     }
 }
 
-/// Read a subscription event from the server.
+/// Reads a subscription event from the server.
 pub fn read_subscription_event(
     r: &mut impl BufRead,
 ) -> Result<(u32, SubscriptionEvent), ProtocolError> {
     let desc = read_descriptor(r)?;
 
     let mut r = r.take(desc.length as u64);
-    let mut ts = serde::TagStructReader::new(&mut r, PROTOCOL_VERSION);
+    let mut ts = serde::TagStructReader::new(&mut r, MAX_VERSION);
     let (cmd, seq) = (ts.read_enum()?, ts.read_u32()?);
 
     match cmd {
@@ -201,9 +203,26 @@ pub fn read_subscription_event(
             Err(ProtocolError::ServerError(error))
         }
         command::CommandTag::SubscribeEvent => Ok((seq, ts.read()?)),
-        _ => Err(ProtocolError::Invalid(format!(
-            "expected subscription event, got {:?}",
-            cmd
-        ))),
+        _ => Err(ProtocolError::UnexpectedCommand(cmd)),
     }
+}
+
+/// Writes a stream chunk.
+pub fn write_memblock<W: Write>(
+    w: &mut W,
+    channel: u32,
+    chunk: &[u8],
+    offset: u64,
+) -> Result<(), ProtocolError> {
+    let desc = Descriptor {
+        length: chunk.len() as u32,
+        channel,
+        offset,
+        flags: DescriptorFlags::empty(),
+    };
+
+    write_descriptor(w, desc)?;
+    w.write_all(chunk)?;
+
+    Ok(())
 }

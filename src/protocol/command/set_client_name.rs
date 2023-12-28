@@ -1,10 +1,10 @@
-use crate::protocol::{serde::*, Props, ProtocolError};
+use crate::protocol::{serde::*, ProtocolError};
 
 use super::CommandReply;
 
 #[derive(Debug)]
 pub struct SetClientNameReply {
-    client_id: u32,
+    pub client_id: u32,
 }
 
 impl CommandReply for SetClientNameReply {}
