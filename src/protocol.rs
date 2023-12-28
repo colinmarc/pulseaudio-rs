@@ -28,13 +28,16 @@ bitflags! {
     /// Special message types.
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
     pub struct DescriptorFlags: u32 {
+        /// Indicates a SHMRELEASE message.
         const FLAG_SHMRELEASE = 0x40000000; // 0b0100
+
+        /// Indicates a SHMREVOKE message.
         const FLAG_SHMREVOKE = 0xC0000000; // 0b1100 FIXME 2 bits set?
     }
 }
 
 /// Packet descriptor / header.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Descriptor {
     /// Payload length in Bytes.
     length: u32,
@@ -147,7 +150,7 @@ pub fn write_command_message<W: Write>(
 }
 
 /// Reads reply data from the server.
-pub fn read_reply_message<T: command::CommandReply>(
+pub fn read_reply_message<T: CommandReply>(
     r: &mut impl BufRead,
 ) -> Result<(u32, T), ProtocolError> {
     let desc = read_descriptor(r)?;

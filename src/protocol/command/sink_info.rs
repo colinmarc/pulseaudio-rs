@@ -9,6 +9,7 @@ use bitflags::bitflags;
 use enum_primitive_derive::Primitive;
 
 bitflags! {
+    /// Sink configuration flags.
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
     pub struct SinkFlags: u32 {
         /// The sink supports hardware volume control.
@@ -41,6 +42,7 @@ bitflags! {
     }
 }
 
+/// The state of a sink.
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum SinkState {
     /// Sink is playing samples: The sink is used by at least one non-paused input.
@@ -77,10 +79,19 @@ pub enum PortAvailable {
 /// A port on a sink or source.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PortInfo {
+    /// The name of the port.
     pub name: CString,
+
+    /// A description of the port.
     pub description: Option<CString>,
+
+    /// The direction of the port.
     pub dir: Direction,
+
+    /// The priority of the port.
     pub priority: u32,
+
+    /// Whether the port is available.
     pub available: PortAvailable,
 }
 
@@ -198,14 +209,19 @@ impl SinkInfo {
     }
 }
 
+/// The parameters for [`Command::GetSinkInfo`]. Either the sink index or the
+/// sink name should be specified.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct GetSinkInfo {
+    /// The index of the sink to query.
     pub index: Option<u32>,
+
+    /// The name of the sink to query.
     pub name: Option<CString>,
 }
 
 impl TagStructRead for GetSinkInfo {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         Ok(Self {
             index: ts.read_index()?,
             name: ts.read_string()?,
@@ -214,7 +230,11 @@ impl TagStructRead for GetSinkInfo {
 }
 
 impl TagStructWrite for GetSinkInfo {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.write_index(self.index)?;
         w.write_string(self.name.as_ref())?;
         Ok(())
@@ -222,7 +242,10 @@ impl TagStructWrite for GetSinkInfo {
 }
 
 impl TagStructRead for SinkInfo {
-    fn read(ts: &mut TagStructReader, protocol_version: u16) -> Result<SinkInfo, ProtocolError> {
+    fn read(
+        ts: &mut TagStructReader<'_>,
+        protocol_version: u16,
+    ) -> Result<SinkInfo, ProtocolError> {
         let mut sink = SinkInfo {
             index: ts
                 .read_index()?
@@ -301,14 +324,18 @@ impl TagStructRead for SinkInfo {
 }
 
 impl TagStructWrite for SinkInfo {
-    fn write(&self, w: &mut TagStructWriter, protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.write_u32(self.index)?;
         w.write_string(Some(&self.name))?;
         w.write_string(self.description.as_ref())?;
         w.write(self.sample_spec.protocol_downgrade(protocol_version))?;
-        w.write(&self.channel_map)?;
+        w.write(self.channel_map)?;
         w.write_index(self.owner_module_index)?;
-        w.write(&self.cvolume)?;
+        w.write(self.cvolume)?;
         w.write_bool(self.muted)?;
         w.write_index(self.monitor_source_index)?; // sink's monitor source
         w.write_string(self.monitor_source_name.as_ref())?;
@@ -355,12 +382,13 @@ impl TagStructWrite for SinkInfo {
     }
 }
 
+/// The server reply to [`super::Command::GetSinkInfoList`].
 pub type SinkInfoList = Vec<SinkInfo>;
 
 impl CommandReply for SinkInfoList {}
 
 impl TagStructRead for SinkInfoList {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         let mut sinks = Vec::new();
         while ts.has_data_left()? {
             sinks.push(ts.read()?);
@@ -371,7 +399,11 @@ impl TagStructRead for SinkInfoList {
 }
 
 impl TagStructWrite for SinkInfoList {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         for sink in self {
             w.write(sink)?;
         }

@@ -33,7 +33,10 @@ pub enum FormatEncoding {
 /// Associates a simple `FormatEncoding` with a list of arbitrary properties.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FormatInfo {
+    /// The sample encoding.
     pub encoding: FormatEncoding,
+
+    /// Key-value properties for the format.
     pub props: Props,
 }
 
@@ -48,7 +51,7 @@ impl FormatInfo {
 }
 
 impl TagStructRead for FormatInfo {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         ts.expect_tag(Tag::FormatInfo)?;
 
         let encoding = ts.read_u8()?;
@@ -62,7 +65,11 @@ impl TagStructRead for FormatInfo {
 }
 
 impl TagStructWrite for FormatInfo {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.inner.write_u8(Tag::FormatInfo as u8)?;
         w.write_u8(self.encoding as u8)?;
         w.write(&self.props)?;

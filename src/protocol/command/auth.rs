@@ -5,23 +5,27 @@ use crate::protocol::{serde::*, ProtocolError};
 use super::CommandReply;
 
 const VERSION_MASK: u32 = 0x0000ffff;
-pub const FLAG_SHM: u32 = 0x80000000;
-pub const FLAG_MEMFD: u32 = 0x40000000;
+pub(crate) const FLAG_SHM: u32 = 0x80000000;
+pub(crate) const FLAG_MEMFD: u32 = 0x40000000;
 
 /// The auth command is the first message a client should send on connection.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct AuthParams {
+    /// The client's protocol version.
     pub version: u16,
+
     /// Whether the client supports shared memory memblocks.
     pub supports_shm: bool,
+
     /// Whether the client supports memfd memblocks.
     pub supports_memfd: bool,
+
     /// A password-like blob, usually created by the server at ~/.pulse-cookie.
     pub cookie: Vec<u8>,
 }
 
 impl TagStructRead for AuthParams {
-    fn read(ts: &mut TagStructReader, _version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _version: u16) -> Result<Self, ProtocolError> {
         let (flags_and_version, cookie) = (ts.read_u32()?, ts.read_arbitrary()?);
 
         Ok(Self {
@@ -34,7 +38,7 @@ impl TagStructRead for AuthParams {
 }
 
 impl TagStructWrite for AuthParams {
-    fn write(&self, w: &mut TagStructWriter, _version: u16) -> Result<(), ProtocolError> {
+    fn write(&self, w: &mut TagStructWriter<'_>, _version: u16) -> Result<(), ProtocolError> {
         let flags_and_version: u32 = (self.version as u32 & VERSION_MASK)
             | if self.supports_shm { FLAG_SHM } else { 0 }
             | if self.supports_memfd { FLAG_MEMFD } else { 0 };
@@ -45,19 +49,23 @@ impl TagStructWrite for AuthParams {
     }
 }
 
-/// Server reply to `Auth` command.
-#[derive(Debug)]
+/// The server reply to [`super::Command::Auth`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AuthReply {
+    /// The negotiated protocol version.
     pub version: u16,
+
+    /// Whether the server supports memfd memblocks.
     pub use_memfd: bool,
+
+    /// Whether the server supports shared memory memblocks.
     pub use_shm: bool,
-    // TODO: What if both are true? Can that ever happen?
 }
 
 impl CommandReply for AuthReply {}
 
 impl TagStructRead for AuthReply {
-    fn read(ts: &mut TagStructReader, _version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _version: u16) -> Result<Self, ProtocolError> {
         let reply = ts.read_u32()?;
 
         Ok(Self {
@@ -69,7 +77,11 @@ impl TagStructRead for AuthReply {
 }
 
 impl TagStructWrite for AuthReply {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         // Auth reply is a tagstruct with just a u32 that looks similar to the "version"
         // field in the auth request. It contains the server's protocol version and the
         // result of the shm and memfd negotiation.

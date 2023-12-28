@@ -3,6 +3,7 @@ use std::ffi::CString;
 use super::CommandReply;
 use crate::protocol::{serde::*, ProtocolError};
 
+/// Server state for a source output, in response to [`super::Command::GetSourceOutputInfo`].
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct SourceOutputInfo {
     /// ID of the source output.
@@ -63,7 +64,7 @@ pub struct SourceOutputInfo {
 impl CommandReply for SourceOutputInfo {}
 
 impl TagStructRead for SourceOutputInfo {
-    fn read(ts: &mut TagStructReader, protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, protocol_version: u16) -> Result<Self, ProtocolError> {
         let mut output_info = Self {
             index: ts.read_u32()?,
             name: ts
@@ -99,14 +100,18 @@ impl TagStructRead for SourceOutputInfo {
 }
 
 impl TagStructWrite for SourceOutputInfo {
-    fn write(&self, w: &mut TagStructWriter, protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.write_u32(self.index)?;
         w.write_string(Some(&self.name))?;
         w.write_index(self.owner_module_index)?;
         w.write_index(self.client_index)?;
         w.write_u32(self.source_index)?;
         w.write(self.sample_spec)?;
-        w.write(&self.channel_map)?;
+        w.write(self.channel_map)?;
         w.write_usec(self.buffer_latency)?;
         w.write_usec(self.source_latency)?;
         w.write_string(self.resample_method.as_ref())?;
@@ -118,7 +123,7 @@ impl TagStructWrite for SourceOutputInfo {
         }
 
         if protocol_version >= 22 {
-            w.write(&self.cvolume)?;
+            w.write(self.cvolume)?;
             w.write_bool(self.muted)?;
             w.write_bool(self.has_volume)?;
             w.write_bool(self.volume_writable)?;
@@ -129,12 +134,13 @@ impl TagStructWrite for SourceOutputInfo {
     }
 }
 
+/// The server reply to [`super::Command::GetSourceOutputInfoList`].
 pub type SourceOutputInfoList = Vec<SourceOutputInfo>;
 
 impl CommandReply for SourceOutputInfoList {}
 
 impl TagStructRead for SourceOutputInfoList {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         let mut outputs = Vec::new();
         while ts.has_data_left()? {
             outputs.push(ts.read()?);
@@ -145,7 +151,11 @@ impl TagStructRead for SourceOutputInfoList {
 }
 
 impl TagStructWrite for SourceOutputInfoList {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         for output in self {
             w.write(output)?;
         }

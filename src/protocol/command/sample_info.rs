@@ -39,7 +39,7 @@ pub struct SampleInfo {
 impl CommandReply for SampleInfo {}
 
 impl TagStructRead for SampleInfo {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         let index = ts.read_u32()?;
         let name = ts
             .read_string()?
@@ -68,13 +68,17 @@ impl TagStructRead for SampleInfo {
 }
 
 impl TagStructWrite for SampleInfo {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.write_u32(self.index)?;
         w.write_string(Some(&self.name))?;
-        w.write(&self.cvolume)?;
+        w.write(self.cvolume)?;
         w.write_usec(self.duration)?;
         w.write(self.sample_spec)?;
-        w.write(&self.channel_map)?;
+        w.write(self.channel_map)?;
         w.write_u32(self.length)?;
         w.write_bool(self.lazy.is_some())?;
         w.write_string(self.lazy.as_ref())?;
@@ -83,12 +87,13 @@ impl TagStructWrite for SampleInfo {
     }
 }
 
+/// The server reply to [`super::Command::GetSampleInfoList`].
 pub type SampleInfoList = Vec<SampleInfo>;
 
 impl CommandReply for SampleInfoList {}
 
 impl TagStructRead for SampleInfoList {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         let mut samples = Vec::new();
         while ts.has_data_left()? {
             samples.push(ts.read()?);
@@ -98,7 +103,11 @@ impl TagStructRead for SampleInfoList {
 }
 
 impl TagStructWrite for SampleInfoList {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         for sample in self {
             w.write(sample)?;
         }

@@ -35,11 +35,13 @@ pub use source_output_info::*;
 pub use subscribe::*;
 pub use timing_info::*;
 
-use super::{serde::*, ProtocolError, PulseError};
+use super::{serde::*, ProtocolError};
 
 use enum_primitive_derive::Primitive;
 use num_traits::FromPrimitive as _;
 
+/// A tag describing a command payload.
+#[allow(missing_docs)]
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum CommandTag {
@@ -201,7 +203,7 @@ pub enum CommandTag {
 }
 
 impl TagStructRead for CommandTag {
-    fn read(r: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(r: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         let v = r.read_u32()?;
 
         CommandTag::from_u32(v)
@@ -210,23 +212,24 @@ impl TagStructRead for CommandTag {
 }
 
 impl TagStructWrite for CommandTag {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.write_u32(*self as u32)?;
 
         Ok(())
     }
 }
 
-// A marker trait for reply data.
+/// A marker trait for reply data.
 pub trait CommandReply: TagStructRead + TagStructWrite {}
 
-pub struct CommandError {
-    pub code: PulseError,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub enum Command {
-    /// A reply to some other command. If this is returned by read_tag_prefixed, the payload has yet to be read.
+    /// A reply to some other command. If this is returned by [`Command::read_tag_prefixed`], the payload has yet to be read.
     Reply,
 
     /// Authentication request (and protocol handshake).
@@ -273,6 +276,8 @@ pub enum Command {
 }
 
 impl Command {
+    /// Read a command message from a tagstruct. A result of [`Command::Reply`]
+    /// indicates that the payload has yet to be read.
     pub fn read_tag_prefixed<R: BufRead>(
         r: &mut R,
         protocol_version: u16,
@@ -401,6 +406,7 @@ impl Command {
         Ok((seq, cmd))
     }
 
+    /// Write a command message as a tagstruct. In the case of a [`Command::Reply`], the payload must be written separately.
     pub fn write_tag_prefixed<W: Write>(
         &self,
         seq: u32,
@@ -416,6 +422,7 @@ impl Command {
         Ok(())
     }
 
+    /// The matching tag for this command.
     pub fn tag(&self) -> CommandTag {
         match self {
             Command::Reply => CommandTag::Reply,
@@ -462,9 +469,9 @@ impl Command {
 impl TagStructWrite for Command {
     fn write(
         &self,
-        w: &mut crate::protocol::serde::TagStructWriter,
+        w: &mut TagStructWriter<'_>,
         _protocol_version: u16,
-    ) -> Result<(), crate::protocol::ProtocolError> {
+    ) -> Result<(), ProtocolError> {
         match self {
             Command::Reply => Ok(()),
 

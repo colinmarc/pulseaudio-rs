@@ -122,7 +122,7 @@ impl Default for SampleSpec {
 }
 
 impl TagStructRead for SampleSpec {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         ts.expect_tag(Tag::SampleSpec)?;
         let format = ts.inner.read_u8()?;
         let format = SampleFormat::from_u8(format)
@@ -134,7 +134,11 @@ impl TagStructRead for SampleSpec {
 }
 
 impl TagStructWrite for SampleSpec {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.inner.write_u8(Tag::SampleSpec as u8)?;
         w.inner.write_u8(self.format as u8)?;
         w.inner.write_u8(self.channels)?;

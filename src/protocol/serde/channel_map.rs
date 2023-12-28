@@ -9,8 +9,10 @@ use crate::protocol::ProtocolError;
 use enum_primitive_derive::Primitive;
 
 /// Channel position labels.
+#[allow(missing_docs)]
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum ChannelPosition {
+    /// No position.
     #[default]
     Mono = 0,
     /// Apple, Dolby call this 'Left'.
@@ -86,7 +88,7 @@ pub enum ChannelPosition {
 /// A map from stream channels to speaker positions.
 ///
 /// These values are relevant for conversion and mixing of streams.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ChannelMap {
     /// Number of channels in the map.
     channels: u8,
@@ -111,6 +113,7 @@ impl ChannelMap {
         }
     }
 
+    /// Creates a channel map with a single channel.
     pub fn mono() -> Self {
         Self {
             channels: 1,
@@ -118,6 +121,7 @@ impl ChannelMap {
         }
     }
 
+    /// Creates a channel map with two channels in the standard stereo positions.
     pub fn stereo() -> Self {
         let mut map = Self::default();
         map.push(ChannelPosition::FrontLeft);
@@ -144,7 +148,7 @@ impl ChannelMap {
 }
 
 impl fmt::Debug for ChannelMap {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Only print the occupied part of the backing storage
         self.map[..self.channels.into()].fmt(f)
     }
@@ -166,7 +170,7 @@ pub struct Iter<'a> {
     next: u8,
 }
 
-impl<'a> Iterator for Iter<'a> {
+impl Iterator for Iter<'_> {
     type Item = ChannelPosition;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
@@ -180,15 +184,14 @@ impl<'a> Iterator for Iter<'a> {
 }
 
 impl TagStructRead for ChannelMap {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         ts.expect_tag(Tag::ChannelMap)?;
 
         let channels = ts.inner.read_u8()?;
-        if channels > sample_spec::CHANNELS_MAX {
+        if channels > CHANNELS_MAX {
             return Err(ProtocolError::Invalid(format!(
                 "channel map too large (max is {} channels, got {})",
-                sample_spec::CHANNELS_MAX,
-                channels
+                CHANNELS_MAX, channels
             )));
         }
 
@@ -205,7 +208,11 @@ impl TagStructRead for ChannelMap {
 }
 
 impl TagStructWrite for ChannelMap {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.inner.write_u8(Tag::ChannelMap as u8)?;
         w.inner.write_u8(self.num_channels())?;
         for channel_pos in self {

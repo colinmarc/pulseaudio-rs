@@ -4,6 +4,7 @@ use enum_primitive_derive::Primitive;
 
 use crate::protocol::{serde::*, *};
 
+/// The state of a source.
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Primitive)]
 pub enum SourceState {
     /// The source is recording and used by at least one non-corked source-output.
@@ -16,6 +17,7 @@ pub enum SourceState {
 }
 
 bitflags! {
+    /// Configuration flags for a source.
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
     pub struct SourceFlags: u32 {
         /// The source supports hardware volume control.
@@ -45,6 +47,7 @@ bitflags! {
     }
 }
 
+/// Server state for a source, in response to [`super::Command::GetSourceInfo`].
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct SourceInfo {
     /// The server-internal source ID.
@@ -116,7 +119,7 @@ pub struct SourceInfo {
 }
 
 impl TagStructRead for SourceInfo {
-    fn read(ts: &mut TagStructReader, protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, protocol_version: u16) -> Result<Self, ProtocolError> {
         let mut source = SourceInfo {
             index: ts
                 .read_index()?
@@ -195,14 +198,18 @@ impl TagStructRead for SourceInfo {
 }
 
 impl TagStructWrite for SourceInfo {
-    fn write(&self, w: &mut TagStructWriter, protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.write_index(Some(self.index))?;
         w.write_string(Some(&self.name))?;
         w.write_string(self.description.as_ref())?;
         w.write(self.sample_spec)?;
-        w.write(&self.channel_map)?;
+        w.write(self.channel_map)?;
         w.write_index(self.owner_module_index)?;
-        w.write(&self.cvolume)?;
+        w.write(self.cvolume)?;
         w.write_bool(self.muted)?;
         w.write_index(self.monitor_of_sink_index)?;
         w.write_string(self.monitor_of_sink_name.as_ref())?;
@@ -255,14 +262,18 @@ impl TagStructWrite for SourceInfo {
 
 impl CommandReply for SourceInfo {}
 
+/// The parameters for [`Command::GetSourceInfo`]. Either the index or the name should be specified.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct GetSourceInfo {
+    /// The index of the source to query.
     pub index: Option<u32>,
+
+    /// The name of the source to query.
     pub name: Option<CString>,
 }
 
 impl TagStructRead for GetSourceInfo {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         Ok(Self {
             index: ts.read_index()?,
             name: ts.read_string()?,
@@ -271,19 +282,24 @@ impl TagStructRead for GetSourceInfo {
 }
 
 impl TagStructWrite for GetSourceInfo {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.write_index(self.index)?;
         w.write_string(self.name.as_ref())?;
         Ok(())
     }
 }
 
+/// The server reply to [`super::Command::GetSourceInfoList`].
 pub type SourceInfoList = Vec<SourceInfo>;
 
 impl CommandReply for SourceInfoList {}
 
 impl TagStructRead for SourceInfoList {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         let mut sources = Vec::new();
         while ts.has_data_left()? {
             sources.push(ts.read()?);
@@ -294,7 +310,11 @@ impl TagStructRead for SourceInfoList {
 }
 
 impl TagStructWrite for SourceInfoList {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         for info in self {
             w.write(info)?;
         }

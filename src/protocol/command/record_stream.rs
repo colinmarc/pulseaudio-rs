@@ -6,6 +6,7 @@ use std::ffi::CString;
 
 use super::CommandReply;
 
+/// Parameters for [`super::Command::CreateRecordStream`].
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct RecordStreamParams {
     /// Sample format for the stream.
@@ -27,6 +28,7 @@ pub struct RecordStreamParams {
     pub flags: StreamFlags,
 
     // FIXME: I don't know what this is for.
+    #[allow(missing_docs)]
     pub direct_on_input: bool,
 
     /// Volume of the stream.
@@ -40,7 +42,7 @@ pub struct RecordStreamParams {
 }
 
 impl TagStructRead for RecordStreamParams {
-    fn read(ts: &mut TagStructReader, protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, protocol_version: u16) -> Result<Self, ProtocolError> {
         let sample_spec = ts.read()?;
         let channel_map = ts.read()?;
         let source_index = ts.read_index()?;
@@ -122,9 +124,13 @@ impl TagStructRead for RecordStreamParams {
 }
 
 impl TagStructWrite for RecordStreamParams {
-    fn write(&self, ts: &mut TagStructWriter, protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        ts: &mut TagStructWriter<'_>,
+        protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         ts.write(self.sample_spec)?;
-        ts.write(&self.channel_map)?;
+        ts.write(self.channel_map)?;
         ts.write_index(self.source_index)?;
         ts.write_string(self.source_name.as_ref())?;
         ts.write_u32(self.buffer_attr.max_length)?;
@@ -157,7 +163,7 @@ impl TagStructWrite for RecordStreamParams {
                 ts.write(format)?;
             }
 
-            ts.write(self.cvolume.clone().unwrap_or_default())?;
+            ts.write(self.cvolume.unwrap_or_default())?;
             ts.write_bool(self.flags.start_muted.unwrap_or_default())?;
             ts.write_bool(self.cvolume.is_some())?;
             ts.write_bool(self.flags.start_muted.is_some())?;
@@ -169,6 +175,7 @@ impl TagStructWrite for RecordStreamParams {
     }
 }
 
+/// The server reply to [`super::Command::CreateRecordStream`].
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct CreateRecordStreamReply {
     /// Channel ID, which is used in other commands to refer to this stream.
@@ -205,7 +212,7 @@ pub struct CreateRecordStreamReply {
 impl CommandReply for CreateRecordStreamReply {}
 
 impl TagStructRead for CreateRecordStreamReply {
-    fn read(ts: &mut TagStructReader, protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, protocol_version: u16) -> Result<Self, ProtocolError> {
         Ok(Self {
             channel_index: ts
                 .read_index()?
@@ -236,14 +243,18 @@ impl TagStructRead for CreateRecordStreamReply {
 }
 
 impl TagStructWrite for CreateRecordStreamReply {
-    fn write(&self, w: &mut TagStructWriter, protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.write_u32(self.channel_index)?;
         w.write_u32(self.stream_index)?;
         w.write_u32(self.buffer_attr.max_length)?;
         w.write_u32(self.buffer_attr.fragsize)?;
 
         w.write(self.sample_spec)?;
-        w.write(&self.channel_map)?;
+        w.write(self.channel_map)?;
         w.write_u32(self.sink_index)?;
         w.write_string(self.sink_name.as_ref())?;
         w.write_bool(self.suspended)?;

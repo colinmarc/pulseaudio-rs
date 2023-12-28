@@ -4,6 +4,7 @@ use crate::protocol::{serde::*, ProtocolError};
 
 use super::CommandReply;
 
+/// Server state for a client, in response to [`super::Command::GetClientInfo`].
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct ClientInfo {
     /// ID of the client.
@@ -25,7 +26,7 @@ pub struct ClientInfo {
 impl CommandReply for ClientInfo {}
 
 impl TagStructRead for ClientInfo {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         Ok(Self {
             index: ts.read_u32()?,
             name: ts
@@ -39,7 +40,11 @@ impl TagStructRead for ClientInfo {
 }
 
 impl TagStructWrite for ClientInfo {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.write_u32(self.index)?;
         w.write_string(Some(&self.name))?;
         w.write_index(self.owner_module_index)?;
@@ -50,12 +55,13 @@ impl TagStructWrite for ClientInfo {
     }
 }
 
+/// The server reply to [`super::Command::GetClientInfoList`].
 pub type ClientInfoList = Vec<ClientInfo>;
 
 impl CommandReply for ClientInfoList {}
 
 impl TagStructRead for ClientInfoList {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         let mut clients = Vec::new();
         while ts.has_data_left()? {
             clients.push(ts.read()?);
@@ -66,7 +72,11 @@ impl TagStructRead for ClientInfoList {
 }
 
 impl TagStructWrite for ClientInfoList {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         for client in self {
             w.write(client)?;
         }

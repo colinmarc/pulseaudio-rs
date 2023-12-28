@@ -4,6 +4,7 @@ use crate::protocol::{serde::*, ProtocolError};
 
 use super::CommandReply;
 
+/// Server state for a server, in response to [`super::Command::GetServerInfo`].
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct ServerInfo {
     /// Server "package name" (usually "pulseaudio")
@@ -37,7 +38,7 @@ pub struct ServerInfo {
 impl CommandReply for ServerInfo {}
 
 impl TagStructRead for ServerInfo {
-    fn read(ts: &mut TagStructReader, protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, protocol_version: u16) -> Result<Self, ProtocolError> {
         let mut info = Self {
             server_name: ts.read_string()?,
             server_version: ts.read_string()?,
@@ -59,7 +60,11 @@ impl TagStructRead for ServerInfo {
 }
 
 impl TagStructWrite for ServerInfo {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.write_string(self.server_name.as_ref())?;
         w.write_string(self.server_version.as_ref())?;
         w.write_string(self.user_name.as_ref())?;
@@ -68,7 +73,7 @@ impl TagStructWrite for ServerInfo {
         w.write_string(self.default_sink_name.as_ref())?;
         w.write_string(self.default_source_name.as_ref())?;
         w.write_u32(self.cookie)?;
-        w.write(&self.channel_map)?;
+        w.write(self.channel_map)?;
         Ok(())
     }
 }

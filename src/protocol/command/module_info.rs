@@ -4,6 +4,7 @@ use crate::protocol::{serde::*, ProtocolError};
 
 use super::CommandReply;
 
+/// Server state for a module, in response to [`super::Command::GetModuleInfo`].
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct ModuleInfo {
     /// ID of the module.
@@ -30,7 +31,7 @@ impl CommandReply for ModuleInfo {}
 
 impl TagStructRead for ModuleInfo {
     #[allow(deprecated)]
-    fn read(ts: &mut TagStructReader, protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, protocol_version: u16) -> Result<Self, ProtocolError> {
         Ok(Self {
             index: ts.read_u32()?,
             name: ts
@@ -54,7 +55,11 @@ impl TagStructRead for ModuleInfo {
 
 impl TagStructWrite for ModuleInfo {
     #[allow(deprecated)]
-    fn write(&self, w: &mut TagStructWriter, protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.write_u32(self.index)?;
         w.write_string(Some(&self.name))?;
         w.write_string(self.argument.as_ref())?;
@@ -70,12 +75,13 @@ impl TagStructWrite for ModuleInfo {
     }
 }
 
+/// The server reply to [`super::Command::GetModuleInfoList`].
 pub type ModuleInfoList = Vec<ModuleInfo>;
 
 impl CommandReply for ModuleInfoList {}
 
 impl TagStructRead for ModuleInfoList {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         let mut modules = Vec::new();
         while ts.has_data_left()? {
             modules.push(ts.read()?);
@@ -85,7 +91,11 @@ impl TagStructRead for ModuleInfoList {
 }
 
 impl TagStructWrite for ModuleInfoList {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         for module in self {
             w.write(module)?;
         }

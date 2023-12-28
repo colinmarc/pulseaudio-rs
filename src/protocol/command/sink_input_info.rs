@@ -3,6 +3,7 @@ use std::ffi::CString;
 use super::CommandReply;
 use crate::protocol::{serde::*, ProtocolError};
 
+/// Server state for a sink input, in response to [`super::Command::GetSinkInputInfo`].
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct SinkInputInfo {
     /// ID of the sink input.
@@ -63,7 +64,7 @@ pub struct SinkInputInfo {
 impl CommandReply for SinkInputInfo {}
 
 impl TagStructRead for SinkInputInfo {
-    fn read(ts: &mut TagStructReader, protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, protocol_version: u16) -> Result<Self, ProtocolError> {
         let mut input_info = Self {
             index: ts.read_u32()?,
             name: ts
@@ -102,15 +103,19 @@ impl TagStructRead for SinkInputInfo {
 }
 
 impl TagStructWrite for SinkInputInfo {
-    fn write(&self, w: &mut TagStructWriter, protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.write_u32(self.index)?;
         w.write_string(Some(&self.name))?;
         w.write_index(self.owner_module_index)?;
         w.write_index(self.client_index)?;
         w.write_u32(self.sink_index)?;
         w.write(self.sample_spec)?;
-        w.write(&self.channel_map)?;
-        w.write(&self.cvolume)?;
+        w.write(self.channel_map)?;
+        w.write(self.cvolume)?;
         w.write_usec(self.buffer_latency)?;
         w.write_usec(self.sink_latency)?;
         w.write_string(self.resample_method.as_ref())?;
@@ -135,12 +140,13 @@ impl TagStructWrite for SinkInputInfo {
     }
 }
 
+/// The server reply to [`super::Command::GetSinkInputInfoList`].
 pub type SinkInputInfoList = Vec<SinkInputInfo>;
 
 impl CommandReply for SinkInputInfoList {}
 
 impl TagStructRead for SinkInputInfoList {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         let mut inputs = Vec::new();
         while ts.has_data_left()? {
             inputs.push(ts.read()?);
@@ -151,7 +157,11 @@ impl TagStructRead for SinkInputInfoList {
 }
 
 impl TagStructWrite for SinkInputInfoList {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         for input in self {
             w.write(input)?;
         }

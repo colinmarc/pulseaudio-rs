@@ -22,7 +22,8 @@ use std::ffi::{CStr, CString};
 use std::io::prelude::*;
 use std::time;
 
-#[allow(bad_style)]
+/// A tag preceding a value in a tagstruct.
+#[allow(missing_docs)]
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum Tag {
@@ -45,9 +46,7 @@ pub enum Tag {
     FormatInfo = b'f',
 }
 
-/// Streaming zero-copy reader for untrusted data.
-///
-/// The data stream is parsed and validated on the fly.
+/// A streaming reader for tagstruct-encoded data.
 pub struct TagStructReader<'a> {
     inner: &'a mut dyn BufRead,
     protocol_version: u16,
@@ -202,15 +201,26 @@ impl<'a> TagStructReader<'a> {
         })
     }
 
+    /// Reads a value which implements [`TagStructRead`].
     pub fn read<T: TagStructRead>(&mut self) -> Result<T, ProtocolError> {
         T::read(self, self.protocol_version)
     }
 
+    /// Returns whether there is any data left in the input stream.
     pub fn has_data_left(&mut self) -> Result<bool, ProtocolError> {
         Ok(self.inner.fill_buf().map(|b| !b.is_empty())?)
     }
 }
 
+impl std::fmt::Debug for TagStructReader<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TagStructReader")
+            .field("protocol_version", &self.protocol_version)
+            .finish()
+    }
+}
+
+/// A streaming writer for tagstruct-encoded data.
 pub struct TagStructWriter<'a> {
     inner: &'a mut dyn Write,
     protocol_version: u16,
@@ -335,13 +345,25 @@ impl<'a> TagStructWriter<'a> {
     }
 }
 
-/// Trait implemented by types that can be serialized into a tagstruct.
-pub trait TagStructWrite {
-    /// Write `self` into a tagstruct.
-    fn write(&self, w: &mut TagStructWriter, protocol_version: u16) -> Result<(), ProtocolError>;
+impl std::fmt::Debug for TagStructWriter<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TagStructWriter")
+            .field("protocol_version", &self.protocol_version)
+            .finish()
+    }
 }
 
-/// Implemented by types that can be deserialized from a tagstruct.
+/// Implemented by types that can be serialized into a tagstruct stream.
+pub trait TagStructWrite {
+    /// Write `self` into a tagstruct.
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        protocol_version: u16,
+    ) -> Result<(), ProtocolError>;
+}
+
+/// Implemented by types that can be deserialized from a tagstruct stream.
 pub trait TagStructRead: Sized {
     /// Read an instance of `Self` from a tagstruct.
     ///
@@ -350,14 +372,18 @@ pub trait TagStructRead: Sized {
     /// * `ts`: The tagstruct to read from.
     /// * `protocol_version`: PulseAudio protocol version, used to decide on the precise data
     ///   format. For old versions, default values might be used for parts of `Self`.
-    fn read(ts: &mut TagStructReader, protocol_version: u16) -> Result<Self, ProtocolError>;
+    fn read(ts: &mut TagStructReader<'_>, protocol_version: u16) -> Result<Self, ProtocolError>;
 }
 
-impl<'a, T: ?Sized> TagStructWrite for &'a T
+impl<T: ?Sized> TagStructWrite for &T
 where
     T: TagStructWrite,
 {
-    fn write(&self, w: &mut TagStructWriter, protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         (*self).write(w, protocol_version)
     }
 }

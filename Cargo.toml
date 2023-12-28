@@ -1,5 +1,6 @@
 [package]
 name = "pulseaudio"
+description = "A native rust implementation of the PulseAudio protocol."
 edition = "2021"
 version = "0.1.0"
 authors = ["Colin Marc <hi@colinmarc.com>", "Jonas Schievink <jonasschievink@gmail.com>"]

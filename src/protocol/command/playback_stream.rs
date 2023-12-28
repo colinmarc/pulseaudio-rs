@@ -6,6 +6,7 @@ use std::ffi::CString;
 
 use super::CommandReply;
 
+/// Parameters for [`super::Command::CreatePlaybackStream`].
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct PlaybackStreamParams {
     /// Sample format for the stream.
@@ -40,7 +41,7 @@ pub struct PlaybackStreamParams {
 }
 
 impl TagStructRead for PlaybackStreamParams {
-    fn read(ts: &mut TagStructReader, protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, protocol_version: u16) -> Result<Self, ProtocolError> {
         let sample_spec = ts.read()?;
         let channel_map = ts.read()?;
         let sink_index = ts.read_index()?;
@@ -128,9 +129,13 @@ impl TagStructRead for PlaybackStreamParams {
 }
 
 impl TagStructWrite for PlaybackStreamParams {
-    fn write(&self, ts: &mut TagStructWriter, protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        ts: &mut TagStructWriter<'_>,
+        protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         ts.write(self.sample_spec)?;
-        ts.write(&self.channel_map)?;
+        ts.write(self.channel_map)?;
         ts.write_index(self.sink_index)?;
         ts.write_string(self.sink_name.as_ref())?;
         ts.write_u32(self.buffer_attr.max_length)?;
@@ -139,7 +144,7 @@ impl TagStructWrite for PlaybackStreamParams {
         ts.write_u32(self.buffer_attr.prebuf)?;
         ts.write_u32(self.buffer_attr.minimum_request_length)?;
         ts.write_u32(self.sync_id)?;
-        ts.write(self.cvolume.clone().unwrap_or_default())?;
+        ts.write(self.cvolume.unwrap_or_default())?;
         ts.write_bool(self.flags.no_remap_channels)?;
         ts.write_bool(self.flags.no_remix_channels)?;
         ts.write_bool(self.flags.fix_format)?;
@@ -181,6 +186,7 @@ impl TagStructWrite for PlaybackStreamParams {
     }
 }
 
+/// The server response to [`super::Command::CreatePlaybackStream`].
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct CreatePlaybackStreamReply {
     /// Channel ID, which is used in other commands to refer to this stream.
@@ -221,7 +227,7 @@ pub struct CreatePlaybackStreamReply {
 impl CommandReply for CreatePlaybackStreamReply {}
 
 impl TagStructRead for CreatePlaybackStreamReply {
-    fn read(ts: &mut TagStructReader, protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, protocol_version: u16) -> Result<Self, ProtocolError> {
         Ok(Self {
             channel: ts
                 .read_index()?
@@ -255,7 +261,11 @@ impl TagStructRead for CreatePlaybackStreamReply {
 }
 
 impl TagStructWrite for CreatePlaybackStreamReply {
-    fn write(&self, w: &mut TagStructWriter, protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.write_u32(self.channel)?;
         w.write_u32(self.stream_index)?;
         w.write_u32(self.requested_bytes)?;
@@ -265,7 +275,7 @@ impl TagStructWrite for CreatePlaybackStreamReply {
         w.write_u32(self.buffer_attr.minimum_request_length)?;
 
         w.write(self.sample_spec)?;
-        w.write(&self.channel_map)?;
+        w.write(self.channel_map)?;
         w.write_u32(self.sink_index)?;
         w.write_string(self.sink_name.as_ref())?;
         w.write_bool(self.suspended)?;

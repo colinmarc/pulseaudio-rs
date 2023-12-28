@@ -7,7 +7,7 @@ use byteorder::NetworkEndian;
 
 use crate::protocol::ProtocolError;
 
-use super::sample_spec::{self, CHANNELS_MAX};
+use super::sample_spec::CHANNELS_MAX;
 use super::*;
 
 const VOLUME_NORM: u32 = 0x10000;
@@ -70,13 +70,13 @@ impl Volume {
 }
 
 impl fmt::Display for Volume {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:.1} dB", self.to_db())
     }
 }
 
 impl fmt::Debug for Volume {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Volume")
             .field(&format!(
                 "raw={:.1}, linear={:.1}, {:.1} dB",
@@ -89,10 +89,7 @@ impl fmt::Debug for Volume {
 }
 
 impl TagStructRead for Volume {
-    fn read(
-        ts: &mut TagStructReader,
-        _protocol_version: u16,
-    ) -> Result<Self, super::ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         ts.expect_tag(super::Tag::Volume)?;
         Ok(Volume::from_u32_clamped(
             ts.inner.read_u32::<NetworkEndian>()?,
@@ -101,7 +98,11 @@ impl TagStructRead for Volume {
 }
 
 impl TagStructWrite for Volume {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.inner.write_u8(Tag::Volume as u8)?;
         w.inner.write_u32::<NetworkEndian>(self.as_u32())?;
         Ok(())
@@ -109,7 +110,7 @@ impl TagStructWrite for Volume {
 }
 
 /// Per-channel volume setting.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ChannelVolume {
     channels: u8,
     volumes: [Volume; CHANNELS_MAX as usize],
@@ -151,7 +152,7 @@ impl ChannelVolume {
 }
 
 impl fmt::Debug for ChannelVolume {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Only print the occupied part of the backing storage
         self.volumes[..self.channels.into()].fmt(f)
     }
@@ -172,17 +173,13 @@ impl<'a> Iterator for Iter<'a> {
 }
 
 impl TagStructRead for ChannelVolume {
-    fn read(
-        ts: &mut TagStructReader,
-        _protocol_version: u16,
-    ) -> Result<Self, super::ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         ts.expect_tag(super::Tag::CVolume)?;
         let n_channels = ts.inner.read_u8()?;
-        if n_channels == 0 || n_channels > sample_spec::CHANNELS_MAX {
+        if n_channels == 0 || n_channels > CHANNELS_MAX {
             return Err(ProtocolError::Invalid(format!(
                 "invalid cvolume channel count {}, must be between 1 and {}",
-                n_channels,
-                sample_spec::CHANNELS_MAX
+                n_channels, CHANNELS_MAX
             )));
         }
 
@@ -197,7 +194,11 @@ impl TagStructRead for ChannelVolume {
 }
 
 impl TagStructWrite for ChannelVolume {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.inner.write_u8(Tag::CVolume as u8)?;
 
         w.inner.write_u8(self.channels().len() as u8)?;

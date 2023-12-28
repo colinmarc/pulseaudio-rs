@@ -73,6 +73,7 @@ impl Props {
         }
     }
 
+    /// Create an Iterator over the properties.
     pub fn iter(&self) -> std::collections::btree_map::Iter<'_, String, Box<[u8]>> {
         self.0.iter()
     }
@@ -95,7 +96,7 @@ impl std::fmt::Debug for Props {
 }
 
 /// Well-known property list keys.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub enum Prop {
     /// For streams: localized media name, formatted as UTF-8. E.g. "Guns'N'Roses: Civil War".
@@ -420,7 +421,7 @@ impl From<Prop> for CString {
 }
 
 impl TagStructRead for Props {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         ts.expect_tag(Tag::PropList)?;
 
         let mut props = Props::new();
@@ -468,7 +469,11 @@ impl TagStructRead for Props {
 }
 
 impl TagStructWrite for Props {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.inner.write_u8(Tag::PropList as u8)?;
 
         for (k, v) in self.iter() {

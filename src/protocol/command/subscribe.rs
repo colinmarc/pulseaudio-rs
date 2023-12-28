@@ -4,6 +4,7 @@ use enum_primitive_derive::Primitive;
 use crate::protocol::{serde::*, ProtocolError};
 
 bitflags! {
+    /// A mask of events to subscribe to.
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
     pub struct SubscriptionMask: u32 {
         /// Sink events.
@@ -43,18 +44,24 @@ bitflags! {
 }
 
 impl TagStructRead for SubscriptionMask {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         Ok(Self::from_bits_truncate(ts.read_u32()?))
     }
 }
 
 impl TagStructWrite for SubscriptionMask {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         w.write_u32(self.bits())?;
         Ok(())
     }
 }
 
+/// The source of a subscription event.
+#[allow(missing_docs)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum SubscriptionEventFacility {
     Sink = 0,
@@ -69,6 +76,8 @@ pub enum SubscriptionEventFacility {
     Card = 9,
 }
 
+/// The type of event.
+#[allow(missing_docs)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum SubscriptionEventType {
     New = 0x00,
@@ -79,6 +88,7 @@ pub enum SubscriptionEventType {
 const FACILITY_MASK: u32 = 0x0F;
 const EVENT_TYPE_MASK: u32 = 0x30;
 
+/// An event from the server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SubscriptionEvent {
     /// The source of the event, i.e. what kind of object it's referring to.
@@ -90,7 +100,7 @@ pub struct SubscriptionEvent {
 }
 
 impl TagStructRead for SubscriptionEvent {
-    fn read(ts: &mut TagStructReader, _protocol_version: u16) -> Result<Self, ProtocolError> {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         use num_traits::FromPrimitive as _;
 
         let raw = ts.read_u32()?;
@@ -109,7 +119,11 @@ impl TagStructRead for SubscriptionEvent {
 }
 
 impl TagStructWrite for SubscriptionEvent {
-    fn write(&self, w: &mut TagStructWriter, _protocol_version: u16) -> Result<(), ProtocolError> {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
         let raw = (self.event_facility as u32) | (self.event_type as u32);
         w.write_u32(raw)?;
         w.write_index(self.index)?;

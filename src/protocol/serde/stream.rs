@@ -21,6 +21,7 @@ pub enum StreamDirection {
     Upload = 3,
 }
 
+/// Stream configuration flags.
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub struct StreamFlags {
     /// Create the stream in the corked state.
