@@ -3,7 +3,6 @@
 use std::io::{BufRead, Write};
 
 mod auth;
-// mod create_playback_stream;
 mod client_info;
 mod module_info;
 mod playback_stream;
@@ -19,7 +18,7 @@ mod source_output_info;
 mod subscribe;
 mod timing_info;
 
-pub use auth::{AuthParams, AuthReply};
+pub use auth::*;
 pub use client_info::*;
 pub use module_info::*;
 pub use playback_stream::*;
