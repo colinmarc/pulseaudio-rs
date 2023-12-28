@@ -1,0 +1,30 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main", "ci" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - run: sudo apt-get install pulseaudio
+    - run: systemctl --user enable pulseaudio
+    - run: systemctl --user start pulseaudio
+    - run: pactl load-module module-null-sink sink_name=test_sink
+    - run: pactl set-default-sink test_sink
+    - name: set XDG_RUNTIME_DIR
+      run: echo "XDG_RUNTIME_DIR=/run/user/$(id -u)" >> $GITHUB_ENV
+
+    - uses: actions/checkout@v3
+    - name: Build
+      run: cargo build --verbose
+    - name: Run tests
+      run: cargo test --verbose --features _integration-tests

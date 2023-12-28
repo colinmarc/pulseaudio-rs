@@ -332,6 +332,8 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "_integration-tests")]
 mod integration_tests {
+    use anyhow::Context;
+
     use super::*;
     use crate::integration_test_util::*;
     use crate::protocol::*;
@@ -340,10 +342,14 @@ mod integration_tests {
     fn create_playback_stream() -> anyhow::Result<()> {
         let mut sock = connect_and_init()?;
 
-        write_command_message(sock.get_mut(), 10, Command::GetServerInfo)?;
-        let (_, server_info) = read_reply_message::<ServerInfo>(&mut sock)?;
+        write_command_message(sock.get_mut(), 10, Command::GetServerInfo)
+            .context("sending get_server_info command failed")?;
+        let (_, server_info) = read_reply_message::<ServerInfo>(&mut sock)
+            .context("get_server_info command failed")?;
 
-        let sink_name = server_info.default_sink_name.unwrap();
+        let sink_name = server_info.default_sink_name.ok_or_else(|| {
+            anyhow::anyhow!("server has no default sink, cannot create playback stream")
+        })?;
 
         write_command_message(
             sock.get_mut(),
@@ -361,6 +367,7 @@ mod integration_tests {
                     start_muted: Some(true),
                     ..Default::default()
                 },
+                sink_index: None,
                 sink_name: Some(sink_name.clone()),
                 ..Default::default()
             }),
