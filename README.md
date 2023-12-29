@@ -1,5 +1,6 @@
 ## pulseaudio-rs
-![tests](https://github.com/github/docs/actions/workflows/tests.yml/badge.svg)
+
+![tests](https://github.com/colinmarc/pulseaudio-rs/actions/workflows/tests.yaml/badge.svg)
 
 This is a native rust implementation of the [PulseAudio](https://www.freedesktop.org/wiki/Software/PulseAudio/) protocol, suitable for writing clients and servers.
 
