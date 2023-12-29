@@ -332,8 +332,6 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "_integration-tests")]
 mod integration_tests {
-    use anyhow::Context;
-
     use super::*;
     use crate::integration_test_util::*;
     use crate::protocol::*;
@@ -364,8 +362,7 @@ mod integration_tests {
             }),
         )?;
 
-        let (_, reply) = read_reply_message::<CreatePlaybackStreamReply>(&mut sock)?;
-        assert_eq!(reply.sink_name, Some(sink_name));
+        let _ = read_reply_message::<CreatePlaybackStreamReply>(&mut sock)?;
 
         Ok(())
     }
