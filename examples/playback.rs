@@ -10,7 +10,7 @@ use std::{
     time,
 };
 
-use anyhow::bail;
+use anyhow::{bail, Context};
 use pulseaudio::protocol::{self, LatencyParams};
 
 fn main() -> anyhow::Result<()> {
@@ -20,8 +20,7 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let mut sock = connect_and_init()?;
-    let sink = default_sink_name(&mut sock)?;
+    let mut sock = connect_and_init().context("failed to initialize client")?;
 
     let mut file = File::open(Path::new(&args[1]))?;
     let mut wav_reader = hound::WavReader::new(&mut file)?;
@@ -64,13 +63,16 @@ fn main() -> anyhow::Result<()> {
                 sample_rate: spec.sample_rate,
             },
             channel_map,
-            sink_name: Some(sink),
+            cvolume: Some(protocol::ChannelVolume::norm(2)),
+            sink_name: Some(CString::new("@DEFAULT_SINK@")?),
             ..Default::default()
         }),
-    )?;
+    )
+    .context("failed to send create_playback_stream")?;
 
     let (seq, stream_info) =
-        protocol::read_reply_message::<protocol::CreatePlaybackStreamReply>(&mut sock)?;
+        protocol::read_reply_message::<protocol::CreatePlaybackStreamReply>(&mut sock)
+            .context("create_playback_stream failed")?;
     assert_eq!(seq, 99);
 
     // Create a buffer for sending data to the server.
@@ -85,7 +87,8 @@ fn main() -> anyhow::Result<()> {
     )?;
 
     // Send initial bytes to the server.
-    protocol::write_memblock(sock.get_mut(), stream_info.channel, &buf[..size], 0)?;
+    protocol::write_memblock(sock.get_mut(), stream_info.channel, &buf[..size], 0)
+        .context("write_memblock failed")?;
 
     loop {
         let (_, msg) = protocol::read_command_message(&mut sock)?;
@@ -103,7 +106,8 @@ fn main() -> anyhow::Result<()> {
                     break;
                 }
 
-                protocol::write_memblock(sock.get_mut(), stream_info.channel, &buf[..size], 0)?;
+                protocol::write_memblock(sock.get_mut(), stream_info.channel, &buf[..size], 0)
+                    .context("write_memblock failed")?;
 
                 // Fetch the current timing information for the stream.
                 let timing_info = get_timing_info(&mut sock, stream_info.channel)?;
@@ -180,9 +184,8 @@ fn connect_and_init() -> anyhow::Result<BufReader<UnixStream>> {
 
     let mut sock = std::io::BufReader::new(UnixStream::connect(&socket_path)?);
 
-    // PulseAudio usually puts an authentication "cookie" in ~/.pulse-cookie.
     let home = std::env::var("HOME")?;
-    let cookie_path = Path::new(&home).join(".pulse-cookie");
+    let cookie_path = Path::new(&home).join(".config/pulse/cookie");
     let auth = if cookie_path.exists() {
         let cookie = std::fs::read(&cookie_path)?;
         protocol::AuthParams {
@@ -209,16 +212,6 @@ fn connect_and_init() -> anyhow::Result<BufReader<UnixStream>> {
     let _ = protocol::read_reply_message::<protocol::SetClientNameReply>(&mut sock)?;
 
     Ok(sock)
-}
-
-fn default_sink_name(sock: &mut BufReader<UnixStream>) -> anyhow::Result<CString> {
-    protocol::write_command_message(sock.get_mut(), 2, protocol::Command::GetServerInfo)?;
-    let (_, info) = protocol::read_reply_message::<protocol::ServerInfo>(sock)?;
-
-    match info.default_sink_name {
-        Some(name) => Ok(name),
-        None => bail!("no default sink"),
-    }
 }
 
 fn get_timing_info(

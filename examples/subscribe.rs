@@ -17,9 +17,9 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut sock = std::io::BufReader::new(UnixStream::connect(&socket_path)?);
 
-    // PulseAudio usually puts an authentication "cookie" in ~/.pulse-cookie.
+    // PulseAudio usually puts an authentication "cookie" in ~/.config/pulse/cookie.
     let home = std::env::var("HOME")?;
-    let cookie_path = Path::new(&home).join(".pulse-cookie");
+    let cookie_path = Path::new(&home).join(".config/pulse/cookie");
     let auth = if cookie_path.exists() {
         let cookie = std::fs::read(&cookie_path)?;
         protocol::AuthParams {
