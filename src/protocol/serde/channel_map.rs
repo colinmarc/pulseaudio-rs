@@ -123,7 +123,7 @@ impl ChannelMap {
 
     /// Creates a channel map with two channels in the standard stereo positions.
     pub fn stereo() -> Self {
-        let mut map = Self::default();
+        let mut map = Self::empty();
         map.push(ChannelPosition::FrontLeft);
         map.push(ChannelPosition::FrontRight);
         map

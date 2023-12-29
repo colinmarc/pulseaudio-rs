@@ -23,19 +23,32 @@ pub mod protocol;
 mod integration_test_util {
     use std::{io::BufReader, os::unix::net::UnixStream};
 
+    use anyhow::Context;
+
     use crate::protocol::*;
 
     pub(crate) fn connect_to_server() -> anyhow::Result<BufReader<UnixStream>> {
         let xdg_runtime_dir = std::env::var("XDG_RUNTIME_DIR")?;
         let socket_path = std::path::Path::new(&xdg_runtime_dir).join("pulse/native");
-        let sock = UnixStream::connect(socket_path)?;
+        let sock = UnixStream::connect(socket_path).context("error connecting to pulse socket")?;
 
         Ok(BufReader::new(sock))
     }
 
     pub(crate) fn init_client(mut sock: &mut BufReader<UnixStream>) -> anyhow::Result<()> {
-        let cookie_path = std::path::Path::new(&std::env::var("HOME")?).join(".pulse-cookie");
-        let cookie = std::fs::read(cookie_path)?;
+        let home = std::env::var("HOME")?;
+        let mut cookie = Vec::new();
+        for cookie_name in &[".pulse-cookie", ".config/pulse/cookie"] {
+            let cookie_path = std::path::Path::new(&home).join(cookie_name);
+            if cookie_path.exists() {
+                cookie = std::fs::read(&cookie_path)?;
+                break;
+            }
+        }
+
+        if cookie.is_empty() {
+            eprintln!("warning: no pulseaudio cookie found");
+        }
 
         let auth = AuthParams {
             version: MAX_VERSION,
@@ -44,13 +57,16 @@ mod integration_test_util {
             cookie,
         };
 
-        write_command_message(sock.get_mut(), 0, Command::Auth(auth))?;
-        let _ = read_reply_message::<AuthReply>(sock)?;
+        write_command_message(sock.get_mut(), 0, Command::Auth(auth))
+            .context("sending auth command failed")?;
+        let _ = read_reply_message::<AuthReply>(sock).context("auth command failed")?;
 
         let mut props = Props::new();
         props.set(Prop::ApplicationName, "pulseaudio-rs-tests");
-        write_command_message(sock.get_mut(), 1, Command::SetClientName(props))?;
-        let _ = read_reply_message::<SetClientNameReply>(&mut sock)?;
+        write_command_message(sock.get_mut(), 1, Command::SetClientName(props))
+            .context("sending set_client_name command failed")?;
+        let _ = read_reply_message::<SetClientNameReply>(&mut sock)
+            .context("set_client_name command failed")?;
 
         Ok(())
     }

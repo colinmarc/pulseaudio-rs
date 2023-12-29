@@ -355,7 +355,7 @@ mod integration_tests {
                     channels: 2,
                 },
                 channel_map: ChannelMap::stereo(),
-                cvolume: None,
+                cvolume: Some(ChannelVolume::norm(2)),
                 flags: StreamFlags {
                     start_corked: true,
                     start_muted: Some(true),
