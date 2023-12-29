@@ -342,15 +342,6 @@ mod integration_tests {
     fn create_playback_stream() -> anyhow::Result<()> {
         let mut sock = connect_and_init()?;
 
-        write_command_message(sock.get_mut(), 10, Command::GetServerInfo)
-            .context("sending get_server_info command failed")?;
-        let (_, server_info) = read_reply_message::<ServerInfo>(&mut sock)
-            .context("get_server_info command failed")?;
-
-        let sink_name = server_info.default_sink_name.ok_or_else(|| {
-            anyhow::anyhow!("server has no default sink, cannot create playback stream")
-        })?;
-
         write_command_message(
             sock.get_mut(),
             0,
@@ -368,7 +359,7 @@ mod integration_tests {
                     ..Default::default()
                 },
                 sink_index: None,
-                sink_name: Some(sink_name.clone()),
+                sink_name: Some(CString::new("@DEFAULT_SINK@")?),
                 ..Default::default()
             }),
         )?;
