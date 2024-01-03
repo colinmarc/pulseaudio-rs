@@ -50,7 +50,7 @@ impl TagStructWrite for AuthParams {
 }
 
 /// The server reply to [`super::Command::Auth`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AuthReply {
     /// The negotiated protocol version.
     pub version: u16,
