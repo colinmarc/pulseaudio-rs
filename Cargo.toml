@@ -17,7 +17,12 @@ thiserror = "1.0.51"
 anyhow = "1.0.76"
 hound = "3.5.1"
 indicatif = "0.17.7"
+mio = { version = "0.8.10", features = ["os-ext", "os-poll", "net"] }
+mio-timerfd = "0.2.0"
 pretty_assertions = "1.4.0"
 
 [features]
 _integration-tests = []
+
+[patch.crates-io]
+mio-timerfd = { git = "https://github.com/colinmarc/mio-timerfd.git" }
