@@ -42,6 +42,27 @@ pub enum SampleFormat {
     S24In32Be = 12,
 }
 
+impl SampleFormat {
+    /// Returns the number of bytes used to store a single sample.
+    pub fn bytes_per_sample(&self) -> usize {
+        match self {
+            SampleFormat::U8 => 1,
+            SampleFormat::Alaw => 1,
+            SampleFormat::Ulaw => 1,
+            SampleFormat::S16Le => 2,
+            SampleFormat::S16Be => 2,
+            SampleFormat::Float32Le => 4,
+            SampleFormat::Float32Be => 4,
+            SampleFormat::S32Le => 4,
+            SampleFormat::S32Be => 4,
+            SampleFormat::S24Le => 3,
+            SampleFormat::S24Be => 3,
+            SampleFormat::S24In32Le => 4,
+            SampleFormat::S24In32Be => 4,
+        }
+    }
+}
+
 /// A sample specification that fully describes the format of a sample stream between 2 endpoints.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SampleSpec {
