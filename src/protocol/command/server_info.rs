@@ -109,9 +109,9 @@ mod integration_tests {
 
     #[test]
     fn get_server_info() -> Result<(), Box<dyn std::error::Error>> {
-        let mut sock = connect_and_init()?;
+        let (mut sock, protocol_version) = connect_and_init()?;
 
-        write_command_message(sock.get_mut(), 0, Command::GetServerInfo)?;
+        write_command_message(sock.get_mut(), 0, Command::GetServerInfo, protocol_version)?;
         let (_, info) = read_reply_message::<ServerInfo>(&mut sock)?;
 
         assert!(info.server_name.is_some(),);

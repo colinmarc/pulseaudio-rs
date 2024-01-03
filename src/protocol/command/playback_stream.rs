@@ -338,7 +338,7 @@ mod integration_tests {
 
     #[test]
     fn create_playback_stream() -> anyhow::Result<()> {
-        let mut sock = connect_and_init()?;
+        let (mut sock, protocol_version) = connect_and_init()?;
 
         write_command_message(
             sock.get_mut(),
@@ -360,6 +360,7 @@ mod integration_tests {
                 sink_name: Some(CString::new("@DEFAULT_SINK@")?),
                 ..Default::default()
             }),
+            protocol_version,
         )?;
 
         let _ = read_reply_message::<CreatePlaybackStreamReply>(&mut sock)?;

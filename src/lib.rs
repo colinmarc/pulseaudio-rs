@@ -35,7 +35,7 @@ mod integration_test_util {
         Ok(BufReader::new(sock))
     }
 
-    pub(crate) fn init_client(mut sock: &mut BufReader<UnixStream>) -> anyhow::Result<()> {
+    pub(crate) fn init_client(mut sock: &mut BufReader<UnixStream>) -> anyhow::Result<u16> {
         let home = std::env::var("HOME")?;
         let mut cookie = Vec::new();
         for cookie_name in &[".pulse-cookie", ".config/pulse/cookie"] {
@@ -57,24 +57,27 @@ mod integration_test_util {
             cookie,
         };
 
-        write_command_message(sock.get_mut(), 0, Command::Auth(auth))
+        write_command_message(sock.get_mut(), 0, Command::Auth(auth), MAX_VERSION)
             .context("sending auth command failed")?;
-        let _ = read_reply_message::<AuthReply>(sock).context("auth command failed")?;
+        let (_, auth_reply) =
+            read_reply_message::<AuthReply>(sock).context("auth command failed")?;
+
+        let version = std::cmp::min(MAX_VERSION, auth_reply.version);
 
         let mut props = Props::new();
         props.set(Prop::ApplicationName, "pulseaudio-rs-tests");
-        write_command_message(sock.get_mut(), 1, Command::SetClientName(props))
+        write_command_message(sock.get_mut(), 1, Command::SetClientName(props), version)
             .context("sending set_client_name command failed")?;
         let _ = read_reply_message::<SetClientNameReply>(&mut sock)
             .context("set_client_name command failed")?;
 
-        Ok(())
+        Ok(version)
     }
 
-    pub(crate) fn connect_and_init() -> anyhow::Result<BufReader<UnixStream>> {
+    pub(crate) fn connect_and_init() -> anyhow::Result<(BufReader<UnixStream>, u16)> {
         let mut sock = connect_to_server()?;
-        init_client(&mut sock)?;
+        let protocol_version = init_client(&mut sock)?;
 
-        Ok(sock)
+        Ok((sock, protocol_version))
     }
 }

@@ -194,9 +194,15 @@ mod integration_tests {
 
     #[test]
     fn get_source_input_info() -> anyhow::Result<()> {
-        let mut sock = connect_and_init()?;
+        let (mut sock, protocol_version) = connect_and_init()?;
 
-        write_command_message(sock.get_mut(), 0, Command::GetSourceOutputInfoList)?;
+        write_command_message(
+            sock.get_mut(),
+            0,
+            Command::GetSourceOutputInfoList,
+            protocol_version,
+        )?;
+
         let (seq, info_list) = read_reply_message::<SourceOutputInfoList>(&mut sock)?;
         assert_eq!(seq, 0);
 
@@ -209,6 +215,7 @@ mod integration_tests {
             sock.get_mut(),
             1,
             Command::GetSourceOutputInfo(info_list[0].index),
+            protocol_version,
         )?;
 
         let (seq, info) = read_reply_message::<SourceOutputInfo>(&mut sock)?;

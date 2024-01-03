@@ -455,9 +455,15 @@ mod integration_tests {
 
     #[test]
     fn list_sinks() -> Result<(), Box<dyn std::error::Error>> {
-        let mut sock = connect_and_init()?;
+        let (mut sock, protocol_version) = connect_and_init()?;
 
-        write_command_message(sock.get_mut(), 0, Command::GetSinkInfoList)?;
+        write_command_message(
+            sock.get_mut(),
+            0,
+            Command::GetSinkInfoList,
+            protocol_version,
+        )?;
+
         let (_, info_list) = read_reply_message::<SinkInfoList>(&mut sock)?;
         assert!(!info_list.is_empty());
 

@@ -163,10 +163,15 @@ mod integration_tests {
 
     #[test]
     fn subscribe() -> anyhow::Result<()> {
-        let mut sock = connect_and_init()?;
+        let (mut sock, protocol_version) = connect_and_init()?;
 
         let mask = SubscriptionMask::SINK | SubscriptionMask::SOURCE;
-        write_command_message(sock.get_mut(), 0, Command::Subscribe(mask))?;
+        write_command_message(
+            sock.get_mut(),
+            0,
+            Command::Subscribe(mask),
+            protocol_version,
+        )?;
         assert_eq!(0, read_ack_message(&mut sock).context("error reading ack")?);
 
         Ok(())

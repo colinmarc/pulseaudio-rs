@@ -20,7 +20,7 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let mut sock = connect_and_init().context("failed to initialize client")?;
+    let (mut sock, protocol_version) = connect_and_init().context("failed to initialize client")?;
 
     let mut file = File::open(Path::new(&args[1]))?;
     let mut wav_reader = hound::WavReader::new(&mut file)?;
@@ -53,6 +53,7 @@ fn main() -> anyhow::Result<()> {
         ))?)
         .with_finish(indicatif::ProgressFinish::AndLeave);
 
+    // Create the playback stream on the server.
     protocol::write_command_message(
         sock.get_mut(),
         99,
@@ -67,6 +68,7 @@ fn main() -> anyhow::Result<()> {
             sink_name: Some(CString::new("@DEFAULT_SINK@")?),
             ..Default::default()
         }),
+        protocol_version,
     )
     .context("failed to send create_playback_stream")?;
 
@@ -99,8 +101,8 @@ fn main() -> anyhow::Result<()> {
     // to poll the socket.
     let mut draining = false;
     loop {
-        let (seq, msg) =
-            protocol::read_command_message(&mut sock).context("reading from socket")?;
+        let (seq, msg) = protocol::read_command_message(&mut sock, protocol_version)
+            .context("reading from socket")?;
 
         match msg {
             // First, the server will indicate when the stream has started.
@@ -129,6 +131,7 @@ fn main() -> anyhow::Result<()> {
                             sock.get_mut(),
                             DRAIN_COMPLETED,
                             protocol::Command::DrainPlaybackStream(stream_info.channel),
+                            protocol_version,
                         )?;
 
                         draining = true;
@@ -143,6 +146,7 @@ fn main() -> anyhow::Result<()> {
                         channel,
                         now: time::SystemTime::now(),
                     }),
+                    protocol_version,
                 )?;
             }
 
@@ -204,7 +208,7 @@ fn read_chunk<T: Read>(
     Ok(cursor.position() as usize)
 }
 
-fn connect_and_init() -> anyhow::Result<BufReader<UnixStream>> {
+fn connect_and_init() -> anyhow::Result<(BufReader<UnixStream>, u16)> {
     let xdg_runtime_dir = std::env::var("XDG_RUNTIME_DIR")?;
     let socket_path = Path::new(&xdg_runtime_dir).join("pulse/native");
     if !socket_path.exists() {
@@ -235,13 +239,25 @@ fn connect_and_init() -> anyhow::Result<BufReader<UnixStream>> {
         }
     };
 
-    protocol::write_command_message(sock.get_mut(), 0, protocol::Command::Auth(auth))?;
-    let _ = protocol::read_reply_message::<protocol::AuthReply>(&mut sock)?;
+    protocol::write_command_message(
+        sock.get_mut(),
+        0,
+        protocol::Command::Auth(auth),
+        protocol::MAX_VERSION,
+    )?;
+
+    let (_, auth_reply) = protocol::read_reply_message::<protocol::AuthReply>(&mut sock)?;
+    let protocol_version = std::cmp::min(protocol::MAX_VERSION, auth_reply.version);
 
     let mut props = protocol::Props::new();
     props.set(protocol::Prop::ApplicationName, "pulseaudio-rs-playback");
-    protocol::write_command_message(sock.get_mut(), 1, protocol::Command::SetClientName(props))?;
-    let _ = protocol::read_reply_message::<protocol::SetClientNameReply>(&mut sock)?;
+    protocol::write_command_message(
+        sock.get_mut(),
+        1,
+        protocol::Command::SetClientName(props),
+        protocol_version,
+    )?;
 
-    Ok(sock)
+    let _ = protocol::read_reply_message::<protocol::SetClientNameReply>(&mut sock)?;
+    Ok((sock, protocol_version))
 }

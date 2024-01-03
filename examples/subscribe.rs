@@ -37,14 +37,29 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    // Write the auth "command" to the socket, and read the reply.
-    protocol::write_command_message(sock.get_mut(), 0, protocol::Command::Auth(auth))?;
-    let _ = protocol::read_reply_message::<protocol::AuthReply>(&mut sock)?;
+    // Write the auth "command" to the socket, and read the reply. The reply
+    // contains the negotiated protocol version.
+    protocol::write_command_message(
+        sock.get_mut(),
+        0,
+        protocol::Command::Auth(auth),
+        protocol::MAX_VERSION,
+    )?;
+
+    let (_, auth_reply) = protocol::read_reply_message::<protocol::AuthReply>(&mut sock)?;
+    let protocol_version = std::cmp::min(protocol::MAX_VERSION, auth_reply.version);
 
     // The next step is to set the client name.
     let mut props = protocol::Props::new();
     props.set(protocol::Prop::ApplicationName, "list-sinks");
-    protocol::write_command_message(sock.get_mut(), 1, protocol::Command::SetClientName(props))?;
+    protocol::write_command_message(
+        sock.get_mut(),
+        1,
+        protocol::Command::SetClientName(props),
+        protocol_version,
+    )?;
+
+    // The reply contains our client ID.
     let _ = protocol::read_reply_message::<protocol::SetClientNameReply>(&mut sock)?;
 
     // Finally, write a command to create a subscription. The mask we pass will
@@ -53,6 +68,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         sock.get_mut(),
         2,
         protocol::Command::Subscribe(protocol::SubscriptionMask::ALL),
+        protocol_version,
     )?;
 
     // The first reply is just an ACK.
@@ -61,10 +77,14 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     eprintln!("waiting for events...");
     loop {
-        let (_, event) = protocol::read_subscription_event(&mut sock)?;
-        eprintln!(
-            "got event {:?} for ID {:?} ({:?})",
-            event.event_type, event.index, event.event_facility
-        );
+        let (_, event) = protocol::read_command_message(&mut sock, protocol_version)?;
+
+        match event {
+            protocol::Command::SubscribeEvent(event) => eprintln!(
+                "got event {:?} for ID {:?} ({:?})",
+                event.event_type, event.index, event.event_facility
+            ),
+            _ => eprintln!("got unexpected event {:?}", event),
+        }
     }
 }

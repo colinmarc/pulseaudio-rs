@@ -354,9 +354,15 @@ mod integration_tests {
 
     #[test]
     fn list_sources() -> Result<(), Box<dyn std::error::Error>> {
-        let mut sock = connect_and_init()?;
+        let (mut sock, protocol_version) = connect_and_init()?;
 
-        write_command_message(sock.get_mut(), 0, Command::GetSourceInfoList)?;
+        write_command_message(
+            sock.get_mut(),
+            0,
+            Command::GetSourceInfoList,
+            protocol_version,
+        )?;
+
         let (seq, info_list) = read_reply_message::<SourceInfoList>(&mut sock)?;
         assert_eq!(seq, 0);
         assert!(!info_list.is_empty());
@@ -368,6 +374,7 @@ mod integration_tests {
                 index: Some(info_list[0].index),
                 ..Default::default()
             }),
+            protocol_version,
         )?;
 
         let (seq, info) = read_reply_message::<SourceInfo>(&mut sock)?;
