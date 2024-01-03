@@ -40,16 +40,16 @@ bitflags! {
 #[derive(Debug, Clone, Copy)]
 pub struct Descriptor {
     /// Payload length in Bytes.
-    length: u32,
+    pub length: u32,
     /// The channel this packet belongs to, or -1 for a control packet.
-    channel: u32,
+    pub channel: u32,
     /// Offset into the memblock, in Bytes.
-    offset: u64,
+    pub offset: u64,
     /// SHMRELEASE or SHMREVOKE to mark packet as such, or:
     ///
     /// For memblock packets:
     /// * Lowest byte: Seek mode
-    flags: DescriptorFlags,
+    pub flags: DescriptorFlags,
 }
 
 /// Read a message header from an input stream.
