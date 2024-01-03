@@ -34,7 +34,7 @@ pub use source_output_info::*;
 pub use subscribe::*;
 pub use timing_info::*;
 
-use super::{serde::*, ProtocolError};
+use super::{serde::*, ProtocolError, PulseError};
 
 use enum_primitive_derive::Primitive;
 
@@ -206,6 +206,9 @@ pub trait CommandReply: TagStructRead + TagStructWrite {}
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub enum Command {
+    /// An error reply to some other command.
+    Error(PulseError),
+
     /// A reply to some other command. If this is returned by [`Command::read_tag_prefixed`], the payload has yet to be read.
     Reply,
 
@@ -402,6 +405,7 @@ impl Command {
     /// The matching tag for this command.
     pub fn tag(&self) -> CommandTag {
         match self {
+            Command::Error(_) => CommandTag::Error,
             Command::Reply => CommandTag::Reply,
 
             Command::Auth(_) => CommandTag::Auth,
@@ -450,6 +454,7 @@ impl TagStructWrite for Command {
         _protocol_version: u16,
     ) -> Result<(), ProtocolError> {
         match self {
+            Command::Error(e) => w.write_u32(*e as u32),
             Command::Reply => Ok(()),
 
             Command::Auth(ref p) => w.write(p),
