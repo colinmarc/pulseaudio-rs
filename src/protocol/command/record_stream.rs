@@ -57,7 +57,7 @@ impl TagStructRead for RecordStreamParams {
 
         let buffer_attr = BufferAttr {
             max_length: buffer_attr_max_length,
-            fragsize: ts.read_u32()?,
+            fragment_size: ts.read_u32()?,
             ..Default::default()
         };
 
@@ -135,7 +135,7 @@ impl TagStructWrite for RecordStreamParams {
         ts.write_string(self.source_name.as_ref())?;
         ts.write_u32(self.buffer_attr.max_length)?;
         ts.write_bool(self.flags.start_corked)?;
-        ts.write_u32(self.buffer_attr.fragsize)?;
+        ts.write_u32(self.buffer_attr.fragment_size)?;
         ts.write_bool(self.flags.no_remap_channels)?;
         ts.write_bool(self.flags.no_remix_channels)?;
         ts.write_bool(self.flags.fix_format)?;
@@ -222,7 +222,7 @@ impl TagStructRead for CreateRecordStreamReply {
                 .ok_or_else(|| ProtocolError::Invalid("invalid stream_index".into()))?,
             buffer_attr: BufferAttr {
                 max_length: ts.read_u32()?,
-                fragsize: ts.read_u32()?,
+                fragment_size: ts.read_u32()?,
                 ..Default::default()
             },
             sample_spec: ts.read()?,
@@ -251,7 +251,7 @@ impl TagStructWrite for CreateRecordStreamReply {
         w.write_u32(self.channel_index)?;
         w.write_u32(self.stream_index)?;
         w.write_u32(self.buffer_attr.max_length)?;
-        w.write_u32(self.buffer_attr.fragsize)?;
+        w.write_u32(self.buffer_attr.fragment_size)?;
 
         w.write(self.sample_spec)?;
         w.write(self.channel_map)?;

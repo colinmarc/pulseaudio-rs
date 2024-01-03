@@ -57,7 +57,7 @@ impl TagStructRead for PlaybackStreamParams {
         let buffer_attr = BufferAttr {
             max_length: buffer_attr_max_length,
             target_length: ts.read_u32()?,
-            prebuf: ts.read_u32()?,
+            pre_buffering: ts.read_u32()?,
             minimum_request_length: ts.read_u32()?,
             ..Default::default()
         };
@@ -141,7 +141,7 @@ impl TagStructWrite for PlaybackStreamParams {
         ts.write_u32(self.buffer_attr.max_length)?;
         ts.write_bool(self.flags.start_corked)?;
         ts.write_u32(self.buffer_attr.target_length)?;
-        ts.write_u32(self.buffer_attr.prebuf)?;
+        ts.write_u32(self.buffer_attr.pre_buffering)?;
         ts.write_u32(self.buffer_attr.minimum_request_length)?;
         ts.write_u32(self.sync_id)?;
         ts.write(self.cvolume.unwrap_or_default())?;
@@ -239,7 +239,7 @@ impl TagStructRead for CreatePlaybackStreamReply {
             buffer_attr: BufferAttr {
                 max_length: ts.read_u32()?,
                 target_length: ts.read_u32()?,
-                prebuf: ts.read_u32()?,
+                pre_buffering: ts.read_u32()?,
                 minimum_request_length: ts.read_u32()?,
                 ..Default::default()
             },
@@ -271,7 +271,7 @@ impl TagStructWrite for CreatePlaybackStreamReply {
         w.write_u32(self.requested_bytes)?;
         w.write_u32(self.buffer_attr.max_length)?;
         w.write_u32(self.buffer_attr.target_length)?;
-        w.write_u32(self.buffer_attr.prebuf)?;
+        w.write_u32(self.buffer_attr.pre_buffering)?;
         w.write_u32(self.buffer_attr.minimum_request_length)?;
 
         w.write(self.sample_spec)?;

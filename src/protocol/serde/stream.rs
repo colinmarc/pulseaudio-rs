@@ -162,7 +162,7 @@ pub struct BufferAttr {
     /// of the buffer is negative.
     ///
     /// Only valid for playback.
-    pub prebuf: u32,
+    pub pre_buffering: u32,
 
     /// Configure the minimum request. The server does not request less than
     /// minreq bytes from the client, instead waits until the buffer is free
@@ -189,7 +189,7 @@ pub struct BufferAttr {
     /// set the source latency is left unmodified.
     ///
     /// Only valid for recording.
-    pub fragsize: u32,
+    pub fragment_size: u32,
 }
 
 impl Default for BufferAttr {
@@ -197,9 +197,9 @@ impl Default for BufferAttr {
         Self {
             max_length: u32::MAX,
             target_length: u32::MAX,
-            prebuf: u32::MAX,
+            pre_buffering: u32::MAX,
             minimum_request_length: u32::MAX,
-            fragsize: u32::MAX,
+            fragment_size: u32::MAX,
         }
     }
 }

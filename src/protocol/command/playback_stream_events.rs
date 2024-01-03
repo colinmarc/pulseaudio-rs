@@ -92,7 +92,7 @@ impl TagStructRead for PlaybackBufferAttrChanged {
             buffer_attr: BufferAttr {
                 max_length: ts.read_u32()?,
                 target_length: ts.read_u32()?,
-                prebuf: ts.read_u32()?,
+                pre_buffering: ts.read_u32()?,
                 minimum_request_length: ts.read_u32()?,
                 ..Default::default()
             },
@@ -110,7 +110,7 @@ impl TagStructWrite for PlaybackBufferAttrChanged {
         w.write_u32(self.stream_index)?;
         w.write_u32(self.buffer_attr.max_length)?;
         w.write_u32(self.buffer_attr.target_length)?;
-        w.write_u32(self.buffer_attr.prebuf)?;
+        w.write_u32(self.buffer_attr.pre_buffering)?;
         w.write_u32(self.buffer_attr.minimum_request_length)?;
         w.write_usec(self.sink_input_latency)?;
         Ok(())

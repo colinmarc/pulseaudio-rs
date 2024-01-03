@@ -38,7 +38,7 @@ pub enum ProtocolError {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Primitive)]
 pub enum PulseError {
     /// Access failure
-    Access = 1,
+    AccessDenied = 1,
     /// Unknown command
     Command = 2,
     /// Invalid argument
