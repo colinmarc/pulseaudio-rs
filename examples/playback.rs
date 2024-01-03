@@ -11,7 +11,7 @@ use std::{
 };
 
 use anyhow::{bail, Context};
-use pulseaudio::protocol::{self, LatencyParams};
+use pulseaudio::protocol;
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -90,60 +90,92 @@ fn main() -> anyhow::Result<()> {
     protocol::write_memblock(sock.get_mut(), stream_info.channel, &buf[..size], 0)
         .context("write_memblock failed")?;
 
+    // PulseAudio uses tags to associate commands with replies. We can use a
+    // token to know which kind of reply we're getting.
+    const TIMING_INFO: u32 = 200;
+    const DRAIN_COMPLETED: u32 = 201;
+
+    // We'll read from the socket in a loop. Real code would probably use something like `mio`
+    // to poll the socket.
+    let mut draining = false;
     loop {
-        let (_, msg) = protocol::read_command_message(&mut sock)?;
+        let (seq, msg) =
+            protocol::read_command_message(&mut sock).context("reading from socket")?;
+
         match msg {
             // First, the server will indicate when the stream has started.
             protocol::Command::Started(_) => pb.reset_elapsed(),
-            // The server will repeatedly send us a request for more bytes.
+
+            // PulseAudio streams are "clocked" by the server. That means we
+            // should wait for the server to request bytes before sending more.
             protocol::Command::Request(protocol::Request { channel, length }) => {
                 if channel != stream_info.channel {
                     bail!("unexpected channel: {}", channel);
                 }
 
-                let size = read_chunk(&mut wav_reader, &mut buf, length as u64)?;
-                if size == 0 {
-                    break;
+                if !draining {
+                    let size = read_chunk(&mut wav_reader, &mut buf, length as u64)?;
+                    if size > 0 {
+                        protocol::write_memblock(
+                            sock.get_mut(),
+                            stream_info.channel,
+                            &buf[..size],
+                            0,
+                        )
+                        .context("write_memblock failed")?;
+                    } else {
+                        // Tell the server we're done sending data.
+                        protocol::write_command_message(
+                            sock.get_mut(),
+                            DRAIN_COMPLETED,
+                            protocol::Command::DrainPlaybackStream(stream_info.channel),
+                        )?;
+
+                        draining = true;
+                    }
                 }
 
-                protocol::write_memblock(sock.get_mut(), stream_info.channel, &buf[..size], 0)
-                    .context("write_memblock failed")?;
-
                 // Fetch the current timing information for the stream.
-                let timing_info = get_timing_info(&mut sock, stream_info.channel)?;
+                protocol::write_command_message(
+                    sock.get_mut(),
+                    TIMING_INFO,
+                    protocol::Command::GetPlaybackLatency(protocol::LatencyParams {
+                        channel,
+                        now: time::SystemTime::now(),
+                    }),
+                )?;
+            }
+
+            // This is a response to the timing info query we fired off just.
+            // The format of the reply depends on the command that we sent,
+            // so the library can't parse it for us -- so we parse it here.
+            protocol::Command::Reply if seq == TIMING_INFO => {
+                let mut ts =
+                    protocol::serde::TagStructReader::new(&mut sock, protocol::MAX_VERSION);
+                let timing_info = ts.read::<protocol::PlaybackLatency>()?;
+
+                // The response includes information that allows us to estimate playback latency.
                 let latency =
                     time::Duration::from_micros(timing_info.sink_usec + timing_info.source_usec);
                 pb.set_message(format!("{}ms latency", latency.as_millis()));
+
+                // The playback position is the server's offset into the buffer,
+                // not the amount of data we've transmitted. We'll use that to
+                // update the progress bar.
                 pb.set_position(timing_info.read_offset as u64)
             }
+
+            // This is a response to the DrainPlaybackStream command, which the
+            // server waits to send until draining is finished. There's no
+            // response payload.
+            protocol::Command::Reply if seq == DRAIN_COMPLETED => break,
+
+            // These are notifications that something went wrong.
             protocol::Command::Underflow(_) => bail!("buffer underrun!"),
             protocol::Command::Overflow(_) => bail!("buffer overrun!"),
+
+            // We ignore all other messages.
             _ => (),
-        }
-    }
-
-    // Tell the server we're done sending data.
-    protocol::write_command_message(
-        sock.get_mut(),
-        101,
-        protocol::Command::DrainPlaybackStream(stream_info.channel),
-    )?;
-
-    // Wait for the server to acknowledge that we're done.
-    loop {
-        let (seq, msg) = protocol::read_command_message(&mut sock)?;
-        match msg {
-            protocol::Command::Reply if seq == 101 => {
-                assert_eq!(seq, 101);
-                break;
-            }
-            _ => {
-                let timing_info = get_timing_info(&mut sock, stream_info.channel)?;
-                let latency =
-                    time::Duration::from_micros(timing_info.sink_usec + timing_info.source_usec);
-                pb.set_message(format!("{}ms latency", latency.as_millis()));
-                pb.set_position(timing_info.read_offset as u64)
-            }
         }
     }
 
@@ -212,21 +244,4 @@ fn connect_and_init() -> anyhow::Result<BufReader<UnixStream>> {
     let _ = protocol::read_reply_message::<protocol::SetClientNameReply>(&mut sock)?;
 
     Ok(sock)
-}
-
-fn get_timing_info(
-    sock: &mut BufReader<UnixStream>,
-    channel: u32,
-) -> anyhow::Result<protocol::PlaybackLatency> {
-    protocol::write_command_message(
-        sock.get_mut(),
-        100,
-        protocol::Command::GetPlaybackLatency(LatencyParams {
-            channel,
-            now: time::SystemTime::now(),
-        }),
-    )?;
-
-    let (_, latency) = protocol::read_reply_message::<protocol::PlaybackLatency>(sock)?;
-    Ok(latency)
 }
