@@ -174,6 +174,74 @@ pub fn read_reply_message<T: CommandReply>(
     }
 }
 
+/// Writes reply data to a buffer, and returns the number of bytes written.
+pub fn encode_reply_message<T: AsRef<[u8]>, R: CommandReply>(
+    seq: u32,
+    reply: R,
+    buf: T,
+    protocol_version: u16,
+) -> Result<usize, ProtocolError>
+where
+    Cursor<T>: Seek + Write,
+{
+    let mut cursor = Cursor::new(buf);
+    cursor.seek(SeekFrom::Start(DESCRIPTOR_SIZE as u64))?;
+
+    let mut ts = TagStructWriter::new(&mut cursor, protocol_version);
+    ts.write_u32(command::CommandTag::Reply as u32)?;
+    ts.write_u32(seq)?;
+    ts.write(reply)?;
+
+    let length = (cursor.position() - DESCRIPTOR_SIZE as u64)
+        .try_into()
+        .map_err(|_| ProtocolError::Invalid("message payload greater than 4gb".to_string()))?;
+
+    let desc = Descriptor {
+        length,
+        channel: u32::MAX,
+        offset: 0,
+        flags: DescriptorFlags::empty(),
+    };
+
+    cursor.set_position(0);
+    write_descriptor(&mut cursor, desc)?;
+
+    Ok(length as usize + DESCRIPTOR_SIZE)
+}
+
+/// Writes reply data to a client. This will allocate a temporary buffer. To
+/// avoid the extra copy, use [`encode_reply_message`].
+pub fn write_reply_message<W: Write, R: CommandReply>(
+    w: &mut W,
+    seq: u32,
+    reply: &R,
+    protocol_version: u16,
+) -> Result<(), ProtocolError> {
+    let mut buf = Cursor::new(Vec::new());
+    let mut ts = TagStructWriter::new(&mut buf, protocol_version);
+
+    ts.write_u32(command::CommandTag::Reply as u32)?;
+    ts.write_u32(seq)?;
+    ts.write(reply)?;
+
+    let length = buf
+        .position()
+        .try_into()
+        .map_err(|_| ProtocolError::Invalid("message payload greater than 4gb".to_string()))?;
+
+    let desc = Descriptor {
+        length,
+        channel: u32::MAX,
+        offset: 0,
+        flags: DescriptorFlags::empty(),
+    };
+
+    write_descriptor(w, desc)?;
+    w.write_all(buf.into_inner().as_slice())?;
+
+    Ok(())
+}
+
 /// Reads an ack (an empty reply) from the server.
 pub fn read_ack_message(r: &mut impl BufRead) -> Result<u32, ProtocolError> {
     let desc = read_descriptor(r)?;
@@ -197,25 +265,76 @@ pub fn read_ack_message(r: &mut impl BufRead) -> Result<u32, ProtocolError> {
     }
 }
 
-/// Reads a subscription event from the server.
-pub fn read_subscription_event(
-    r: &mut impl BufRead,
-    protocol_version: u16,
-) -> Result<(u32, SubscriptionEvent), ProtocolError> {
-    let desc = read_descriptor(r)?;
+/// Writes an ack (an empty reply) to a buffer, and returns the number of bytes
+/// written.
+pub fn encode_ack_message<T: AsRef<[u8]>>(seq: u32, buf: T) -> Result<usize, ProtocolError>
+where
+    Cursor<T>: Seek + Write,
+{
+    let mut cursor = Cursor::new(buf);
+    cursor.seek(SeekFrom::Start(DESCRIPTOR_SIZE as u64))?;
 
-    let mut r = r.take(desc.length as u64);
-    let mut ts = serde::TagStructReader::new(&mut r, protocol_version);
-    let (cmd, seq) = (ts.read_enum()?, ts.read_u32()?);
+    // Protocol version doesn't matter for this.
+    let mut ts = TagStructWriter::new(&mut cursor, MAX_VERSION);
+    ts.write_u32(command::CommandTag::Reply as u32)?;
+    ts.write_u32(seq)?;
 
-    match cmd {
-        command::CommandTag::Error => {
-            let error = ts.read_enum()?;
-            Err(ProtocolError::ServerError(error))
-        }
-        command::CommandTag::SubscribeEvent => Ok((seq, ts.read()?)),
-        _ => Err(ProtocolError::UnexpectedCommand(cmd)),
-    }
+    let length = (cursor.position() - DESCRIPTOR_SIZE as u64)
+        .try_into()
+        .map_err(|_| ProtocolError::Invalid("message payload greater than 4gb".to_string()))?;
+
+    let desc = Descriptor {
+        length,
+        channel: u32::MAX,
+        offset: 0,
+        flags: DescriptorFlags::empty(),
+    };
+
+    cursor.set_position(0);
+    write_descriptor(&mut cursor, desc)?;
+
+    Ok(length as usize + DESCRIPTOR_SIZE)
+}
+
+/// Write an ack (an empty reply) to a client.
+pub fn write_ack_message<W: Write>(w: &mut W, seq: u32) -> Result<(), ProtocolError> {
+    let desc = Descriptor {
+        length: 8, // Two U32s.
+        channel: u32::MAX,
+        offset: 0,
+        flags: DescriptorFlags::empty(),
+    };
+
+    write_descriptor(w, desc)?;
+
+    // Protocol version doesn't matter for this.
+    let mut ts = TagStructWriter::new(w, MAX_VERSION);
+
+    ts.write_u32(command::CommandTag::Reply as u32)?;
+    ts.write_u32(seq)?;
+
+    Ok(())
+}
+
+/// Write an error reply to a client. This is equivalent to [`write_command_message`] with [`Command::Error`].
+pub fn write_error<W: Write>(w: &mut W, seq: u32, error: PulseError) -> Result<(), ProtocolError> {
+    let desc = Descriptor {
+        length: 12, // Three u32s.
+        channel: u32::MAX,
+        offset: 0,
+        flags: DescriptorFlags::empty(),
+    };
+
+    write_descriptor(w, desc)?;
+
+    // Protocol version doesn't matter for this.
+    let mut ts = TagStructWriter::new(w, MAX_VERSION);
+
+    ts.write_u32(command::CommandTag::Error as u32)?;
+    ts.write_u32(seq)?;
+    ts.write_u32(error as u32)?;
+
+    Ok(())
 }
 
 /// Writes a stream chunk.
