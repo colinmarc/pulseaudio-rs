@@ -37,7 +37,6 @@ pub use timing_info::*;
 use super::{serde::*, ProtocolError};
 
 use enum_primitive_derive::Primitive;
-use num_traits::FromPrimitive as _;
 
 /// A tag describing a command payload.
 #[allow(missing_docs)]
@@ -199,27 +198,6 @@ pub enum CommandTag {
     /* Supported since protocol v31 (9.0)
      * BOTH DIRECTIONS */
     RegisterMemfdShmid = 103,
-}
-
-impl TagStructRead for CommandTag {
-    fn read(r: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
-        let v = r.read_u32()?;
-
-        CommandTag::from_u32(v)
-            .ok_or_else(|| ProtocolError::Invalid(format!("invalid command tag: {}", v)))
-    }
-}
-
-impl TagStructWrite for CommandTag {
-    fn write(
-        &self,
-        w: &mut TagStructWriter<'_>,
-        _protocol_version: u16,
-    ) -> Result<(), ProtocolError> {
-        w.write_u32(*self as u32)?;
-
-        Ok(())
-    }
 }
 
 /// A marker trait for reply data.
