@@ -277,7 +277,7 @@ impl Command {
             CommandTag::DeleteRecordStream => Ok(Command::DeleteRecordStream(ts.read_u32()?)),
             CommandTag::LookupSink => Err(ProtocolError::Unimplemented(command)),
             CommandTag::LookupSource => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::DrainPlaybackStream => Err(ProtocolError::Unimplemented(command)),
+            CommandTag::DrainPlaybackStream => Ok(Command::DrainPlaybackStream(ts.read_u32()?)),
             CommandTag::Stat => Err(ProtocolError::Unimplemented(command)),
             CommandTag::GetPlaybackLatency => Err(ProtocolError::Unimplemented(command)),
             CommandTag::CreateUploadStream => Err(ProtocolError::Unimplemented(command)),
