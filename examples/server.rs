@@ -20,11 +20,9 @@ const CLOCK_SPEED_HZ: u64 = 100;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StreamState {
-    // The number of bytes remaining before we can start 'playback'.
-    Prebuffering(u64),
+    Prebuffering(u64), // The number of bytes remaining before we can start 'playback'.
     Playing,
-    // The seq of the drain request, so we can ack it.
-    Draining(u32),
+    Draining(u32), // The seq of the drain request, so we can ack it.
 }
 
 #[derive(Debug)]
@@ -58,20 +56,17 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    // Create a new event loop that accepts UDP connections.
-    let mut poll = Poll::new().unwrap();
-
-    // These are for the whole server.
+    // Create a new event loop that accepts connections on a unix socket.
     const ACCEPT: Token = Token(0);
     const CLOCK: Token = Token(1);
 
-    // Client tokens start at 1024.
-    let mut next_client_token = 1024;
-
-    // This is our listening socket.
+    let mut poll = Poll::new().unwrap();
     let mut listener = UnixListener::bind(&args[1])?;
     poll.registry()
         .register(&mut listener, ACCEPT, mio::Interest::READABLE)?;
+
+    // Client tokens start at 1024.
+    let mut next_client_token = 1024;
 
     // This is a timer for reading audio data. The slower we run, the more data
     // we would have to buffer (if we weren't throwing it away).
@@ -79,8 +74,6 @@ fn main() -> anyhow::Result<()> {
     clock.set_timeout_interval(&time::Duration::from_nanos(1_000_000_000 / CLOCK_SPEED_HZ))?;
     poll.registry()
         .register(&mut clock, CLOCK, mio::Interest::READABLE)?;
-
-    let mut events = Events::with_capacity(256);
 
     // Keep track of our client connections.
     let mut clients: HashMap<Token, Client> = HashMap::new();
@@ -94,6 +87,7 @@ fn main() -> anyhow::Result<()> {
     // A reusable buffer for reading incoming messages.
     let mut scratch = Vec::new();
 
+    let mut events = Events::with_capacity(256);
     loop {
         poll.poll(&mut events, None).unwrap();
 
@@ -146,7 +140,8 @@ fn main() -> anyhow::Result<()> {
                                 && bytes_needed > stream.buffer_attr.minimum_request_length as usize
                             {
                                 // We should request more bytes to fill the buffer.
-                                eprintln!("requesting stream write for {} bytes", bytes_needed);
+                                eprintln!("channel {}: requesting {} bytes", id, bytes_needed);
+
                                 stream.requested_bytes += bytes_needed;
                                 protocol::write_command_message(
                                     &mut client.socket,
@@ -164,8 +159,8 @@ fn main() -> anyhow::Result<()> {
                             let stream = client.playback_streams.remove(&id).unwrap();
                             eprintln!("channel {} finished playback!", id);
 
-                            if let StreamState::Draining(seq) = stream.state {
-                                protocol::write_ack_message(&mut client.socket, seq)?;
+                            if let StreamState::Draining(drain_seq) = stream.state {
+                                protocol::write_ack_message(&mut client.socket, drain_seq)?;
                             } else {
                                 unreachable!()
                             }
@@ -337,6 +332,7 @@ fn handle_command(
                 client.protocol_version,
             )?;
         }
+        // The drain command means we should play the rest of the data we have.
         protocol::Command::DrainPlaybackStream(channel) => {
             if let Some(stream) = client.playback_streams.get_mut(&channel) {
                 stream.state = StreamState::Draining(seq);
