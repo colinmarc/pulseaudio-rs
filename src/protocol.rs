@@ -121,7 +121,7 @@ where
     cursor.set_position(0);
     write_descriptor(&mut cursor, desc)?;
 
-    Ok(cursor.position() as usize)
+    Ok(length as usize + DESCRIPTOR_SIZE)
 }
 
 /// Writes a command message to an output stream. This will allocate a temporary
