@@ -29,9 +29,7 @@ impl TagStructRead for ClientInfo {
     fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         Ok(Self {
             index: ts.read_u32()?,
-            name: ts
-                .read_string()?
-                .ok_or_else(|| ProtocolError::Invalid("null client name".into()))?,
+            name: ts.read_string_non_null()?,
             owner_module_index: ts.read_index()?,
             driver: ts.read_string()?,
             props: ts.read()?,

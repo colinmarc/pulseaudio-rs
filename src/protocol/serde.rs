@@ -177,6 +177,16 @@ impl<'a> TagStructReader<'a> {
         }
     }
 
+    /// Reads a null-terminated string.
+    pub fn read_string_non_null(&mut self) -> Result<CString, ProtocolError> {
+        self.expect_tag(Tag::String)?;
+
+        let mut buf = Vec::new();
+        self.inner.read_until(0x00, &mut buf)?;
+        CString::from_vec_with_nul(buf)
+            .map_err(|e| ProtocolError::Invalid(format!("invalid string in tagstruct: {}", e)))
+    }
+
     /// Reads a u32, and checks it against PA_INVALID_INDEX (-1).
     pub fn read_index(&mut self) -> Result<Option<u32>, ProtocolError> {
         const INVALID_INDEX: u32 = u32::MAX;

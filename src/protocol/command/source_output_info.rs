@@ -67,9 +67,7 @@ impl TagStructRead for SourceOutputInfo {
     fn read(ts: &mut TagStructReader<'_>, protocol_version: u16) -> Result<Self, ProtocolError> {
         let mut output_info = Self {
             index: ts.read_u32()?,
-            name: ts
-                .read_string()?
-                .ok_or_else(|| ProtocolError::Invalid("null source output name".into()))?,
+            name: ts.read_string_non_null()?,
             owner_module_index: ts.read_index()?,
             client_index: ts.read_index()?,
             source_index: ts.read_u32()?,

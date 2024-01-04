@@ -41,9 +41,7 @@ impl CommandReply for SampleInfo {}
 impl TagStructRead for SampleInfo {
     fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         let index = ts.read_u32()?;
-        let name = ts
-            .read_string()?
-            .ok_or_else(|| ProtocolError::Invalid("null sample name".into()))?;
+        let name = ts.read_string_non_null()?;
         let cvolume = ts.read()?;
         let duration = ts.read_usec()?;
         let sample_spec = ts.read()?;

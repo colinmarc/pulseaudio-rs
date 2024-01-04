@@ -124,9 +124,7 @@ impl TagStructRead for SourceInfo {
             index: ts
                 .read_index()?
                 .ok_or_else(|| ProtocolError::Invalid("invalid source index".into()))?,
-            name: ts
-                .read_string()?
-                .ok_or_else(|| ProtocolError::Invalid("null source name".into()))?,
+            name: ts.read_string_non_null()?,
             description: ts.read_string()?,
             sample_spec: ts.read()?,
             channel_map: ts.read()?,

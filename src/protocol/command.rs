@@ -1,9 +1,13 @@
 //! Commands are the top-level IPC structure used in the protocol.
 
-use std::io::{BufRead, Write};
+use std::{
+    ffi::CString,
+    io::{BufRead, Write},
+};
 
 mod auth;
 mod client_info;
+mod lookup;
 mod module_info;
 mod playback_stream;
 mod playback_stream_events;
@@ -15,11 +19,14 @@ mod sink_info;
 mod sink_input_info;
 mod source_info;
 mod source_output_info;
+mod stat;
 mod subscribe;
 mod timing_info;
+mod upload_stream;
 
 pub use auth::*;
 pub use client_info::*;
+pub use lookup::*;
 pub use module_info::*;
 pub use playback_stream::*;
 pub use playback_stream_events::*;
@@ -31,8 +38,10 @@ pub use sink_info::*;
 pub use sink_input_info::*;
 pub use source_info::*;
 pub use source_output_info::*;
+pub use stat::*;
 pub use subscribe::*;
 pub use timing_info::*;
+pub use upload_stream::*;
 
 use super::{serde::*, ProtocolError, PulseError};
 
@@ -208,6 +217,8 @@ pub trait CommandReply: TagStructRead + TagStructWrite {}
 pub enum Command {
     /// An error reply to some other command.
     Error(PulseError),
+    Timeout,
+    Exit,
 
     /// A reply to some other command. If this is returned by [`Command::read_tag_prefixed`], the payload has yet to be read.
     Reply,
@@ -226,8 +237,12 @@ pub enum Command {
     DrainPlaybackStream(u32),
     GetPlaybackLatency(LatencyParams),
     GetRecordLatency(LatencyParams),
+    CreateUploadStream(UploadStreamParams),
+    DeleteUploadStream(u32),
+    FinishUploadStream(u32),
 
     /// So-called introspection commands, to read back the state of the server.
+    Stat,
     GetServerInfo,
     GetSinkInfo(GetSinkInfo),
     GetSinkInfoList,
@@ -244,6 +259,8 @@ pub enum Command {
     GetSampleInfo(u32),
     GetSampleInfoList,
     Subscribe(SubscriptionMask),
+    LookupSink(CString),
+    LookupSource(CString),
 
     Request(Request),
     Overflow(u32),
@@ -270,7 +287,7 @@ impl Command {
             CommandTag::Timeout => Err(ProtocolError::Timeout),
             CommandTag::Reply => Ok(Command::Reply),
 
-            CommandTag::Exit => Err(ProtocolError::Unimplemented(command)),
+            CommandTag::Exit => Ok(Command::Exit),
             CommandTag::Auth => Ok(Command::Auth(ts.read()?)),
             CommandTag::SetClientName => Ok(Command::SetClientName(ts.read()?)),
 
@@ -278,14 +295,14 @@ impl Command {
             CommandTag::DeletePlaybackStream => Ok(Command::DeletePlaybackStream(ts.read_u32()?)),
             CommandTag::CreateRecordStream => Ok(Command::CreateRecordStream(ts.read()?)),
             CommandTag::DeleteRecordStream => Ok(Command::DeleteRecordStream(ts.read_u32()?)),
-            CommandTag::LookupSink => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::LookupSource => Err(ProtocolError::Unimplemented(command)),
+            CommandTag::LookupSink => Ok(Command::LookupSink(ts.read_string_non_null()?)),
+            CommandTag::LookupSource => Ok(Command::LookupSource(ts.read_string_non_null()?)),
             CommandTag::DrainPlaybackStream => Ok(Command::DrainPlaybackStream(ts.read_u32()?)),
-            CommandTag::Stat => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::GetPlaybackLatency => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::CreateUploadStream => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::DeleteUploadStream => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::FinishUploadStream => Err(ProtocolError::Unimplemented(command)),
+            CommandTag::Stat => Ok(Command::Stat),
+            CommandTag::GetPlaybackLatency => Ok(Command::GetPlaybackLatency(ts.read()?)),
+            CommandTag::CreateUploadStream => Ok(Command::CreateUploadStream(ts.read()?)),
+            CommandTag::DeleteUploadStream => Ok(Command::DeleteUploadStream(ts.read_u32()?)),
+            CommandTag::FinishUploadStream => Ok(Command::FinishUploadStream(ts.read_u32()?)),
             CommandTag::PlaySample => Err(ProtocolError::Unimplemented(command)),
             CommandTag::RemoveSample => Err(ProtocolError::Unimplemented(command)),
 
@@ -406,6 +423,8 @@ impl Command {
     pub fn tag(&self) -> CommandTag {
         match self {
             Command::Error(_) => CommandTag::Error,
+            Command::Timeout => CommandTag::Timeout,
+            Command::Exit => CommandTag::Exit,
             Command::Reply => CommandTag::Reply,
 
             Command::Auth(_) => CommandTag::Auth,
@@ -417,7 +436,11 @@ impl Command {
             Command::DrainPlaybackStream(_) => CommandTag::DrainPlaybackStream,
             Command::GetPlaybackLatency(_) => CommandTag::GetPlaybackLatency,
             Command::GetRecordLatency(_) => CommandTag::GetRecordLatency,
+            Command::CreateUploadStream(_) => CommandTag::CreateUploadStream,
+            Command::DeleteUploadStream(_) => CommandTag::DeleteUploadStream,
+            Command::FinishUploadStream(_) => CommandTag::FinishUploadStream,
 
+            Command::Stat => CommandTag::Stat,
             Command::GetServerInfo => CommandTag::GetServerInfo,
             Command::GetSinkInfo(_) => CommandTag::GetSinkInfo,
             Command::GetSinkInfoList => CommandTag::GetSinkInfoList,
@@ -436,6 +459,9 @@ impl Command {
             Command::GetSampleInfoList => CommandTag::GetSampleInfoList,
             Command::Subscribe(_) => CommandTag::Subscribe,
             Command::SubscribeEvent(_) => CommandTag::SubscribeEvent,
+            Command::LookupSink(_) => CommandTag::LookupSink,
+            Command::LookupSource(_) => CommandTag::LookupSource,
+
             Command::Request(_) => CommandTag::Request,
             Command::Overflow(_) => CommandTag::Overflow,
             Command::Underflow(_) => CommandTag::Underflow,
@@ -455,7 +481,9 @@ impl TagStructWrite for Command {
     ) -> Result<(), ProtocolError> {
         match self {
             Command::Error(e) => w.write_u32(*e as u32),
+            Command::Timeout => Ok(()),
             Command::Reply => Ok(()),
+            Command::Exit => Ok(()),
 
             Command::Auth(ref p) => w.write(p),
             Command::SetClientName(ref p) => w.write(p),
@@ -466,16 +494,31 @@ impl TagStructWrite for Command {
             Command::DrainPlaybackStream(chan) => w.write_u32(*chan),
             Command::GetPlaybackLatency(ref p) => w.write(p),
             Command::GetRecordLatency(ref p) => w.write(p),
+            Command::CreateUploadStream(ref p) => w.write(p),
+            Command::DeleteUploadStream(chan) => w.write_u32(*chan),
+            Command::FinishUploadStream(chan) => w.write_u32(*chan),
 
+            Command::Stat => Ok(()),
+            Command::GetServerInfo => Ok(()),
             Command::GetSinkInfo(ref p) => w.write(p),
+            Command::GetSinkInfoList => Ok(()),
             Command::GetSourceInfo(ref p) => w.write(p),
+            Command::GetSourceInfoList => Ok(()),
             Command::GetModuleInfo(id) => w.write_u32(*id),
+            Command::GetModuleInfoList => Ok(()),
             Command::GetClientInfo(id) => w.write_u32(*id),
+            Command::GetClientInfoList => Ok(()),
             Command::GetSinkInputInfo(id) => w.write_u32(*id),
+            Command::GetSinkInputInfoList => Ok(()),
             Command::GetSourceOutputInfo(id) => w.write_u32(*id),
+            Command::GetSourceOutputInfoList => Ok(()),
             Command::GetSampleInfo(id) => w.write_u32(*id),
+            Command::GetSampleInfoList => Ok(()),
             Command::Subscribe(mask) => w.write(mask),
             Command::SubscribeEvent(ref p) => w.write(p),
+            Command::LookupSink(ref p) => w.write_string(Some(p)),
+            Command::LookupSource(ref p) => w.write_string(Some(p)),
+
             Command::Request(ref p) => w.write(p),
             Command::Overflow(chan) => w.write_u32(*chan),
             Command::Underflow(ref p) => w.write(p),
@@ -483,14 +526,6 @@ impl TagStructWrite for Command {
             Command::RecordStreamKilled(chan) => w.write_u32(*chan),
             Command::Started(chan) => w.write_u32(*chan),
             Command::PlaybackBufferAttrChanged(ref p) => w.write(p),
-            Command::GetServerInfo
-            | Command::GetSinkInfoList
-            | Command::GetSourceInfoList
-            | Command::GetModuleInfoList
-            | Command::GetClientInfoList
-            | Command::GetSinkInputInfoList
-            | Command::GetSourceOutputInfoList
-            | Command::GetSampleInfoList => Ok(()),
         }
     }
 }

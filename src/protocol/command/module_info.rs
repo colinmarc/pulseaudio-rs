@@ -34,9 +34,7 @@ impl TagStructRead for ModuleInfo {
     fn read(ts: &mut TagStructReader<'_>, protocol_version: u16) -> Result<Self, ProtocolError> {
         Ok(Self {
             index: ts.read_u32()?,
-            name: ts
-                .read_string()?
-                .ok_or_else(|| ProtocolError::Invalid("null module name".into()))?,
+            name: ts.read_string_non_null()?,
             argument: ts.read_string()?,
             n_used: ts.read_index()?,
             auto_unload: if protocol_version < 15 {
