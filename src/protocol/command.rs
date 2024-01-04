@@ -220,16 +220,16 @@ pub enum Command {
     Timeout,
     Exit,
 
-    /// A reply to some other command. If this is returned by [`Command::read_tag_prefixed`], the payload has yet to be read.
+    // A reply to some other command. If this is returned by [`Command::read_tag_prefixed`], the payload has yet to be read.
     Reply,
 
-    /// Authentication request (and protocol handshake).
+    // Authentication request (and protocol handshake).
     Auth(AuthParams),
 
-    /// Updates client properties (not just the name).
+    // Updates client properties (not just the name).
     SetClientName(Props),
 
-    /// Create and delete streams.
+    // Create and delete streams.
     CreatePlaybackStream(PlaybackStreamParams),
     DeletePlaybackStream(u32),
     CreateRecordStream(RecordStreamParams),
@@ -241,7 +241,7 @@ pub enum Command {
     DeleteUploadStream(u32),
     FinishUploadStream(u32),
 
-    /// So-called introspection commands, to read back the state of the server.
+    // So-called introspection commands, to read back the state of the server.
     Stat,
     GetServerInfo,
     GetSinkInfo(GetSinkInfo),
@@ -262,6 +262,7 @@ pub enum Command {
     LookupSink(CString),
     LookupSource(CString),
 
+    // Events from the server to the client.
     Request(Request),
     Overflow(u32),
     Underflow(Underflow),
