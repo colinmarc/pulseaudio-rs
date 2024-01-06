@@ -29,7 +29,7 @@ pub struct RecordStreamParams {
 
     // FIXME: I don't know what this is for.
     #[allow(missing_docs)]
-    pub direct_on_input: bool,
+    pub direct_on_input_index: Option<u32>,
 
     /// Volume of the stream.
     pub cvolume: Option<ChannelVolume>,
@@ -73,7 +73,7 @@ impl TagStructRead for RecordStreamParams {
         flags.adjust_latency = ts.read_bool()?;
         let props = ts.read()?;
 
-        let direct_on_input = ts.read_bool()?;
+        let direct_on_input_index = ts.read_index()?;
 
         let mut params = Self {
             sample_spec,
@@ -83,7 +83,7 @@ impl TagStructRead for RecordStreamParams {
             buffer_attr,
             flags,
             props,
-            direct_on_input,
+            direct_on_input_index,
             ..Default::default()
         };
 
@@ -146,7 +146,7 @@ impl TagStructWrite for RecordStreamParams {
         ts.write_bool(self.flags.peak_detect)?;
         ts.write_bool(self.flags.adjust_latency)?;
         ts.write(&self.props)?;
-        ts.write_bool(self.direct_on_input)?;
+        ts.write_index(self.direct_on_input_index)?;
 
         if protocol_version >= 14 {
             ts.write_bool(self.flags.early_requests)?;
