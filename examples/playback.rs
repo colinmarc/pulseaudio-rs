@@ -156,8 +156,7 @@ fn main() -> anyhow::Result<()> {
             // The format of the reply depends on the command that we sent,
             // so the library can't parse it for us -- so we parse it here.
             protocol::Command::Reply if seq == TIMING_INFO => {
-                let mut ts =
-                    protocol::serde::TagStructReader::new(&mut sock, protocol::MAX_VERSION);
+                let mut ts = protocol::serde::TagStructReader::new(&mut sock, protocol_version);
                 let timing_info = ts.read::<protocol::PlaybackLatency>()?;
 
                 // The response includes information that allows us to estimate playback latency.
@@ -180,8 +179,10 @@ fn main() -> anyhow::Result<()> {
             protocol::Command::Underflow(_) => bail!("buffer underrun!"),
             protocol::Command::Overflow(_) => bail!("buffer overrun!"),
 
+            protocol::Command::Error(e) => bail!("server error: {:?}", e),
+
             // We ignore all other messages.
-            _ => (),
+            _ => eprintln!("ignoring message: {:#?}", msg),
         }
     }
 
