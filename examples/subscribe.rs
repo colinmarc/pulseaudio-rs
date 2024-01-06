@@ -1,40 +1,22 @@
-use std::{os::unix::net::UnixStream, path::Path};
+use std::os::unix::net::UnixStream;
 
 use pulseaudio::protocol;
 
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Find and connect to PulseAudio. The socket is usually in a well-known
     // location under XDG_RUNTIME_DIR.
-    let xdg_runtime_dir = std::env::var("XDG_RUNTIME_DIR")?;
-    let socket_path = Path::new(&xdg_runtime_dir).join("pulse/native");
-    if !socket_path.exists() {
-        return Err(format!(
-            "pulseaudio socket not found at {}",
-            socket_path.to_string_lossy()
-        )
-        .into());
-    }
-
-    let mut sock = std::io::BufReader::new(UnixStream::connect(&socket_path)?);
+    let socket_path = pulseaudio::socket_path_from_env().ok_or("PulseAudio not available")?;
+    let mut sock = std::io::BufReader::new(UnixStream::connect(socket_path)?);
 
     // PulseAudio usually puts an authentication "cookie" in ~/.config/pulse/cookie.
-    let home = std::env::var("HOME")?;
-    let cookie_path = Path::new(&home).join(".config/pulse/cookie");
-    let auth = if cookie_path.exists() {
-        let cookie = std::fs::read(&cookie_path)?;
-        protocol::AuthParams {
-            version: protocol::MAX_VERSION,
-            supports_shm: false,
-            supports_memfd: false,
-            cookie,
-        }
-    } else {
-        protocol::AuthParams {
-            version: protocol::MAX_VERSION,
-            supports_shm: false,
-            supports_memfd: false,
-            cookie: Vec::new(),
-        }
+    let cookie = pulseaudio::cookie_path_from_env()
+        .and_then(|path| std::fs::read(path).ok())
+        .unwrap_or_default();
+    let auth = protocol::AuthParams {
+        version: protocol::MAX_VERSION,
+        supports_shm: false,
+        supports_memfd: false,
+        cookie,
     };
 
     // Write the auth "command" to the socket, and read the reply. The reply

@@ -209,34 +209,17 @@ fn read_chunk<T: Read>(
 }
 
 fn connect_and_init() -> anyhow::Result<(BufReader<UnixStream>, u16)> {
-    let xdg_runtime_dir = std::env::var("XDG_RUNTIME_DIR")?;
-    let socket_path = Path::new(&xdg_runtime_dir).join("pulse/native");
-    if !socket_path.exists() {
-        bail!(
-            "pulseaudio socket not found at {}",
-            socket_path.to_string_lossy()
-        );
-    }
+    let socket_path = pulseaudio::socket_path_from_env().context("PulseAudio not available")?;
+    let mut sock = std::io::BufReader::new(UnixStream::connect(socket_path)?);
 
-    let mut sock = std::io::BufReader::new(UnixStream::connect(&socket_path)?);
-
-    let home = std::env::var("HOME")?;
-    let cookie_path = Path::new(&home).join(".config/pulse/cookie");
-    let auth = if cookie_path.exists() {
-        let cookie = std::fs::read(&cookie_path)?;
-        protocol::AuthParams {
-            version: protocol::MAX_VERSION,
-            supports_shm: false,
-            supports_memfd: false,
-            cookie,
-        }
-    } else {
-        protocol::AuthParams {
-            version: protocol::MAX_VERSION,
-            supports_shm: false,
-            supports_memfd: false,
-            cookie: Vec::new(),
-        }
+    let cookie = pulseaudio::cookie_path_from_env()
+        .and_then(|path| std::fs::read(path).ok())
+        .unwrap_or_default();
+    let auth = protocol::AuthParams {
+        version: protocol::MAX_VERSION,
+        supports_shm: false,
+        supports_memfd: false,
+        cookie,
     };
 
     protocol::write_command_message(

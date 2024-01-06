@@ -1,4 +1,5 @@
-//! A pure Rust implementation of the PulseAudio protocol, suitable for writing servers and clients.
+//! A pure Rust implementation of the PulseAudio protocol, suitable for writing
+//! servers and clients.
 
 #![warn(
     anonymous_parameters,
@@ -16,7 +17,64 @@
     variant_size_differences
 )]
 
+use std::path::PathBuf;
+
 pub mod protocol;
+
+/// Attempts to determine the socket path from the runtime environment, checking
+/// the following locations in order:
+///   - $PULSE_SERVER
+///   - $PULSE_RUNTIME_PATH/pulse/native
+///   - $XDG_RUNTIME_DIR/pulse/native
+///
+/// Returns None if no socket can be found or if $PULSE_SERVER points to a
+/// remote server, i.e. starts with a prefix other than 'unix:'.
+pub fn socket_path_from_env() -> Option<PathBuf> {
+    let paths = std::env::var("PULSE_SERVER")
+        .ok()
+        .filter(|s| s.starts_with("unix:"))
+        .map(|s| PathBuf::from(&s[5..]))
+        .into_iter()
+        .chain(
+            std::env::var("PULSE_RUNTIME_PATH")
+                .ok()
+                .map(|s| PathBuf::from(s).join("pulse/native")),
+        )
+        .chain(
+            std::env::var("XDG_RUNTIME_DIR")
+                .ok()
+                .map(|s| PathBuf::from(s).join("pulse/native")),
+        );
+
+    for path in paths {
+        let stat = std::fs::metadata(&path).ok()?;
+        if !stat.permissions().readonly() {
+            return Some(path);
+        }
+    }
+
+    None
+}
+
+/// Attempts to find the authentication cookie from the environment, checking
+/// the following locations in order:
+///
+///   - $PULSE_COOKIE
+///   - $HOME/.config/pulse/cookie
+///   - $HOME/.pulse-cookie
+pub fn cookie_path_from_env() -> Option<PathBuf> {
+    #[allow(deprecated)]
+    let home = std::env::home_dir()?;
+
+    let mut paths = std::env::var("PULSE_COOKIE")
+        .ok()
+        .map(PathBuf::from)
+        .into_iter()
+        .chain(std::iter::once(home.join(".config/pulse/cookie")))
+        .chain(std::iter::once(home.join(".pulse-cookie")));
+
+    paths.find(|path| path.exists())
+}
 
 #[cfg(test)]
 #[cfg(feature = "_integration-tests")]
@@ -25,27 +83,29 @@ mod integration_test_util {
 
     use anyhow::Context;
 
+    use super::*;
     use crate::protocol::*;
 
+    #[test]
+    fn socket_path() -> anyhow::Result<()> {
+        let path = socket_path_from_env();
+        assert!(path.is_some());
+        assert!(path.unwrap().exists());
+
+        Ok(())
+    }
+
     pub(crate) fn connect_to_server() -> anyhow::Result<BufReader<UnixStream>> {
-        let xdg_runtime_dir = std::env::var("XDG_RUNTIME_DIR")?;
-        let socket_path = std::path::Path::new(&xdg_runtime_dir).join("pulse/native");
+        let socket_path = socket_path_from_env().context("error finding pulse socket")?;
         let sock = UnixStream::connect(socket_path).context("error connecting to pulse socket")?;
 
         Ok(BufReader::new(sock))
     }
 
     pub(crate) fn init_client(mut sock: &mut BufReader<UnixStream>) -> anyhow::Result<u16> {
-        let home = std::env::var("HOME")?;
-        let mut cookie = Vec::new();
-        for cookie_name in &[".pulse-cookie", ".config/pulse/cookie"] {
-            let cookie_path = std::path::Path::new(&home).join(cookie_name);
-            if cookie_path.exists() {
-                cookie = std::fs::read(&cookie_path)?;
-                break;
-            }
-        }
-
+        let cookie = cookie_path_from_env()
+            .and_then(|path| std::fs::read(path).ok())
+            .unwrap_or_default();
         if cookie.is_empty() {
             eprintln!("warning: no pulseaudio cookie found");
         }
@@ -60,18 +120,23 @@ mod integration_test_util {
         write_command_message(sock.get_mut(), 0, Command::Auth(auth), MAX_VERSION)
             .context("sending auth command failed")?;
         let (_, auth_reply) =
-            read_reply_message::<AuthReply>(sock).context("auth command failed")?;
+            read_reply_message::<AuthReply>(sock, MAX_VERSION).context("auth command failed")?;
 
-        let version = std::cmp::min(MAX_VERSION, auth_reply.version);
+        let protocol_version = std::cmp::min(MAX_VERSION, auth_reply.version);
 
         let mut props = Props::new();
         props.set(Prop::ApplicationName, "pulseaudio-rs-tests");
-        write_command_message(sock.get_mut(), 1, Command::SetClientName(props), version)
-            .context("sending set_client_name command failed")?;
-        let _ = read_reply_message::<SetClientNameReply>(&mut sock)
+        write_command_message(
+            sock.get_mut(),
+            1,
+            Command::SetClientName(props),
+            protocol_version,
+        )
+        .context("sending set_client_name command failed")?;
+        let _ = read_reply_message::<SetClientNameReply>(&mut sock, protocol_version)
             .context("set_client_name command failed")?;
 
-        Ok(version)
+        Ok(protocol_version)
     }
 
     pub(crate) fn connect_and_init() -> anyhow::Result<(BufReader<UnixStream>, u16)> {
