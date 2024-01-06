@@ -363,7 +363,7 @@ mod integration_tests {
             protocol_version,
         )?;
 
-        let _ = read_reply_message::<CreatePlaybackStreamReply>(&mut sock)?;
+        let _ = read_reply_message::<CreatePlaybackStreamReply>(&mut sock, protocol_version)?;
 
         Ok(())
     }

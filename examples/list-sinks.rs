@@ -27,7 +27,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         protocol::Command::Auth(auth),
         protocol::MAX_VERSION,
     )?;
-    let (_, auth_info) = protocol::read_reply_message::<protocol::AuthReply>(&mut sock)?;
+    let (_, auth_info) =
+        protocol::read_reply_message::<protocol::AuthReply>(&mut sock, protocol::MAX_VERSION)?;
     let protocol_version = std::cmp::min(protocol::MAX_VERSION, auth_info.version);
 
     // The next step is to set the client name.
@@ -40,7 +41,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         protocol_version,
     )?;
 
-    let _ = protocol::read_reply_message::<protocol::SetClientNameReply>(&mut sock)?;
+    let _ =
+        protocol::read_reply_message::<protocol::SetClientNameReply>(&mut sock, protocol_version)?;
 
     // Finally, write a command to get the list of sinks. The reply contains the information we're after.
     protocol::write_command_message(
@@ -50,7 +52,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         protocol_version,
     )?;
 
-    let (_, info_list) = protocol::read_reply_message::<protocol::SinkInfoList>(&mut sock)?;
+    let (_, info_list) =
+        protocol::read_reply_message::<protocol::SinkInfoList>(&mut sock, protocol_version)?;
     for info in info_list {
         println!("{:#?}", info);
     }

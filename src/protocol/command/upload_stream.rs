@@ -149,7 +149,8 @@ mod integration_tests {
             protocol_version,
         )?;
 
-        let (_, reply) = read_reply_message::<CreateUploadStreamReply>(&mut sock)?;
+        let (_, reply) =
+            read_reply_message::<CreateUploadStreamReply>(&mut sock, protocol_version)?;
         assert_eq!(reply.length, 1024);
 
         Ok(())

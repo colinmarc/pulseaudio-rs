@@ -28,7 +28,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         protocol::MAX_VERSION,
     )?;
 
-    let (_, auth_reply) = protocol::read_reply_message::<protocol::AuthReply>(&mut sock)?;
+    let (_, auth_reply) =
+        protocol::read_reply_message::<protocol::AuthReply>(&mut sock, protocol::MAX_VERSION)?;
     let protocol_version = std::cmp::min(protocol::MAX_VERSION, auth_reply.version);
 
     // The next step is to set the client name.
@@ -42,7 +43,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // The reply contains our client ID.
-    let _ = protocol::read_reply_message::<protocol::SetClientNameReply>(&mut sock)?;
+    let _ =
+        protocol::read_reply_message::<protocol::SetClientNameReply>(&mut sock, protocol_version)?;
 
     // Finally, write a command to create a subscription. The mask we pass will
     // determine which events we get.

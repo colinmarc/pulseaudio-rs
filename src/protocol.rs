@@ -157,11 +157,12 @@ pub fn write_command_message<W: Write>(
 /// Reads reply data from the server.
 pub fn read_reply_message<T: CommandReply>(
     r: &mut impl BufRead,
+    protocol_version: u16,
 ) -> Result<(u32, T), ProtocolError> {
     let desc = read_descriptor(r)?;
 
     let mut r = r.take(desc.length as u64);
-    let mut ts = serde::TagStructReader::new(&mut r, MAX_VERSION);
+    let mut ts = serde::TagStructReader::new(&mut r, protocol_version);
     let (cmd, seq) = (ts.read_enum()?, ts.read_u32()?);
 
     match cmd {
@@ -169,7 +170,7 @@ pub fn read_reply_message<T: CommandReply>(
             let error = ts.read_enum()?;
             Err(ProtocolError::ServerError(error))
         }
-        command::CommandTag::Reply => Ok((seq, T::read(&mut ts, MAX_VERSION)?)),
+        command::CommandTag::Reply => Ok((seq, T::read(&mut ts, protocol_version)?)),
         _ => Err(ProtocolError::UnexpectedCommand(cmd)),
     }
 }

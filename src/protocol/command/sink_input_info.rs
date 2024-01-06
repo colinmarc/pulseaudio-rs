@@ -207,7 +207,8 @@ mod integration_tests {
             protocol_version,
         )?;
 
-        let (seq, info_list) = read_reply_message::<SinkInputInfoList>(&mut sock)?;
+        let (seq, info_list) =
+            read_reply_message::<SinkInputInfoList>(&mut sock, protocol_version)?;
         assert_eq!(seq, 0);
 
         // The list is often empty.
@@ -222,7 +223,7 @@ mod integration_tests {
             protocol_version,
         )?;
 
-        let (seq, _) = read_reply_message::<SinkInputInfo>(&mut sock)?;
+        let (seq, _) = read_reply_message::<SinkInputInfo>(&mut sock, protocol_version)?;
         assert_eq!(seq, 1);
 
         Ok(())

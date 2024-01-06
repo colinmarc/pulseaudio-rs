@@ -462,7 +462,7 @@ mod integration_tests {
             protocol_version,
         )?;
 
-        let (_, info_list) = read_reply_message::<SinkInfoList>(&mut sock)?;
+        let (_, info_list) = read_reply_message::<SinkInfoList>(&mut sock, protocol_version)?;
         assert!(!info_list.is_empty());
 
         Ok(())

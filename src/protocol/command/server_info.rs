@@ -112,7 +112,7 @@ mod integration_tests {
         let (mut sock, protocol_version) = connect_and_init()?;
 
         write_command_message(sock.get_mut(), 0, Command::GetServerInfo, protocol_version)?;
-        let (_, info) = read_reply_message::<ServerInfo>(&mut sock)?;
+        let (_, info) = read_reply_message::<ServerInfo>(&mut sock, protocol_version)?;
 
         assert!(info.server_name.is_some(),);
         assert!(info.server_version.is_some());

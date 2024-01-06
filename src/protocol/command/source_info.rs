@@ -361,7 +361,7 @@ mod integration_tests {
             protocol_version,
         )?;
 
-        let (seq, info_list) = read_reply_message::<SourceInfoList>(&mut sock)?;
+        let (seq, info_list) = read_reply_message::<SourceInfoList>(&mut sock, protocol_version)?;
         assert_eq!(seq, 0);
         assert!(!info_list.is_empty());
 
@@ -375,7 +375,7 @@ mod integration_tests {
             protocol_version,
         )?;
 
-        let (seq, info) = read_reply_message::<SourceInfo>(&mut sock)?;
+        let (seq, info) = read_reply_message::<SourceInfo>(&mut sock, protocol_version)?;
         assert_eq!(seq, 1);
         assert_eq!(info, info_list[0]);
 

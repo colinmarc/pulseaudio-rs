@@ -72,9 +72,11 @@ fn main() -> anyhow::Result<()> {
     )
     .context("failed to send create_playback_stream")?;
 
-    let (seq, stream_info) =
-        protocol::read_reply_message::<protocol::CreatePlaybackStreamReply>(&mut sock)
-            .context("create_playback_stream failed")?;
+    let (seq, stream_info) = protocol::read_reply_message::<protocol::CreatePlaybackStreamReply>(
+        &mut sock,
+        protocol_version,
+    )
+    .context("create_playback_stream failed")?;
     assert_eq!(seq, 99);
 
     // Create a buffer for sending data to the server.
@@ -229,7 +231,8 @@ fn connect_and_init() -> anyhow::Result<(BufReader<UnixStream>, u16)> {
         protocol::MAX_VERSION,
     )?;
 
-    let (_, auth_reply) = protocol::read_reply_message::<protocol::AuthReply>(&mut sock)?;
+    let (_, auth_reply) =
+        protocol::read_reply_message::<protocol::AuthReply>(&mut sock, protocol::MAX_VERSION)?;
     let protocol_version = std::cmp::min(protocol::MAX_VERSION, auth_reply.version);
 
     let mut props = protocol::Props::new();
@@ -241,6 +244,7 @@ fn connect_and_init() -> anyhow::Result<(BufReader<UnixStream>, u16)> {
         protocol_version,
     )?;
 
-    let _ = protocol::read_reply_message::<protocol::SetClientNameReply>(&mut sock)?;
+    let _ =
+        protocol::read_reply_message::<protocol::SetClientNameReply>(&mut sock, protocol_version)?;
     Ok((sock, protocol_version))
 }
