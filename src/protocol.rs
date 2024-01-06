@@ -300,7 +300,7 @@ where
 /// Write an ack (an empty reply) to a client.
 pub fn write_ack_message<W: Write>(w: &mut W, seq: u32) -> Result<(), ProtocolError> {
     let desc = Descriptor {
-        length: 8, // Two U32s.
+        length: 10, // Two tagged u32s.
         channel: u32::MAX,
         offset: 0,
         flags: DescriptorFlags::empty(),
@@ -320,7 +320,7 @@ pub fn write_ack_message<W: Write>(w: &mut W, seq: u32) -> Result<(), ProtocolEr
 /// Write an error reply to a client. This is equivalent to [`write_command_message`] with [`Command::Error`].
 pub fn write_error<W: Write>(w: &mut W, seq: u32, error: PulseError) -> Result<(), ProtocolError> {
     let desc = Descriptor {
-        length: 12, // Three u32s.
+        length: 15, // Three tagged u32s.
         channel: u32::MAX,
         offset: 0,
         flags: DescriptorFlags::empty(),
