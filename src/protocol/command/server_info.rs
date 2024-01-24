@@ -91,7 +91,11 @@ mod tests {
             server_version: Some(CString::new("bar").unwrap()),
             user_name: Some(CString::new("baz").unwrap()),
             host_name: None,
-            sample_spec: SampleSpec::new(SampleFormat::S16Le, 2, 44100).expect("samplespec"),
+            sample_spec: SampleSpec {
+                format: SampleFormat::S16Le,
+                channels: 2,
+                sample_rate: 44100,
+            },
             default_sink_name: Some(CString::new("sink0").unwrap()),
             default_source_name: Some(CString::new("source0").unwrap()),
             cookie: 0xdeadbeef,

@@ -8,8 +8,6 @@ use crate::protocol::ProtocolError;
 /// Maximum number of channels.
 pub const CHANNELS_MAX: u8 = 32;
 
-const RATE_MAX: u32 = 48000 * 8;
-
 /// Describes how individual samples are encoded.
 #[derive(Debug, Copy, Clone, Primitive, PartialEq, Eq, Default)]
 pub enum SampleFormat {
@@ -68,49 +66,13 @@ impl SampleFormat {
 pub struct SampleSpec {
     /// Format / Encoding of individual samples.
     pub format: SampleFormat,
-    /// Number of independent channels. Must be at least 1.
+    /// Number of independent channels.
     pub channels: u8,
     /// Number of samples per second (and per channel).
     pub sample_rate: u32,
 }
 
 impl SampleSpec {
-    /// Creates a new sample specification.
-    ///
-    /// # Parameters
-    ///
-    /// * `format`: Format of individual samples.
-    /// * `channels`: Number of independent channels (must be at least 1).
-    /// * `sample_rate`: Samples per second and per channel.
-    pub fn new(
-        format: SampleFormat,
-        channels: u8,
-        sample_rate: u32,
-    ) -> Result<Self, ProtocolError> {
-        if channels == 0 || channels > CHANNELS_MAX {
-            return Err(ProtocolError::Invalid(format!(
-                "invalid channel count {} (must be between 1 and {})",
-                channels, CHANNELS_MAX
-            )));
-        }
-
-        if sample_rate == 0 || sample_rate > RATE_MAX * 101 / 100 {
-            // PA says: "The extra 1% is due to module-loopback: it temporarily sets a
-            // higher-than-nominal rate to get rid of excessive buffer latency"
-            // TODO: We might get away without this workaround
-            return Err(ProtocolError::Invalid(format!(
-                "invalid sample rate {} (must be between 1 and {})",
-                sample_rate, RATE_MAX
-            )));
-        }
-
-        Ok(Self {
-            format,
-            channels,
-            sample_rate,
-        })
-    }
-
     /// Modifies a `SampleSpec` to be compatible with a different `protocol_version` so that older
     /// clients can understand it.
     pub fn protocol_downgrade(self, protocol_version: u16) -> SampleSpec {
@@ -150,7 +112,12 @@ impl TagStructRead for SampleSpec {
             .ok_or_else(|| ProtocolError::Invalid(format!("invalid sample format {}", format)))?;
         let channels = ts.inner.read_u8()?;
         let sample_rate = ts.inner.read_u32::<NetworkEndian>()?;
-        Self::new(format, channels, sample_rate)
+
+        Ok(Self {
+            format,
+            channels,
+            sample_rate,
+        })
     }
 }
 
@@ -176,7 +143,12 @@ mod tests {
 
     #[test]
     fn sample_spec_serde() -> anyhow::Result<()> {
-        let spec = SampleSpec::new(SampleFormat::S16Le, 2, 44100)?;
+        let spec = SampleSpec {
+            format: SampleFormat::S16Le,
+            channels: 2,
+            sample_rate: 44100,
+        };
+
         test_serde(&spec)
     }
 }

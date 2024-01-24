@@ -173,26 +173,21 @@ pub struct SinkInfo {
 }
 
 impl SinkInfo {
-    /// The server should create a dummy sink on startup if no other sinks can be found.
+    /// Creates a "dummy" sink, which the PulseAudio server returns when there
+    /// are no sinks.
     pub fn new_dummy(index: u32) -> Self {
         Self {
             index,
             name: CString::new("Dummy Sink").unwrap(),
             props: Props::new(),
             state: SinkState::Idle,
-            sample_spec: SampleSpec::new(SampleFormat::Float32Le, 2, 48000).unwrap(),
-            channel_map: {
-                let mut map = ChannelMap::empty();
-                map.push(ChannelPosition::FrontLeft);
-                map.push(ChannelPosition::FrontRight);
-                map
+            sample_spec: SampleSpec {
+                format: SampleFormat::S16Le,
+                channels: 2,
+                sample_rate: 48000,
             },
-            cvolume: {
-                let mut vol = ChannelVolume::empty();
-                vol.push(Volume::from_linear(1.0));
-                vol.push(Volume::from_linear(1.0));
-                vol
-            },
+            channel_map: ChannelMap::stereo(),
+            cvolume: ChannelVolume::norm(2),
             muted: false,
             flags: SinkFlags::empty(),
             ports: vec![PortInfo {
@@ -429,14 +424,22 @@ mod tests {
                 index: 0,
                 name: CString::new("sink0").unwrap(),
                 props: props1,
-                sample_spec: SampleSpec::new(SampleFormat::S16Le, 2, 44100).expect("samplespec"),
+                sample_spec: SampleSpec {
+                    format: SampleFormat::S16Le,
+                    channels: 2,
+                    sample_rate: 44100,
+                },
                 ..Default::default()
             },
             SinkInfo {
                 index: 1,
                 name: CString::new("sink1").unwrap(),
                 props: props2,
-                sample_spec: SampleSpec::new(SampleFormat::S16Le, 2, 44100).expect("samplespec"),
+                sample_spec: SampleSpec {
+                    format: SampleFormat::S16Le,
+                    channels: 2,
+                    sample_rate: 44100,
+                },
                 ..Default::default()
             },
         ];
