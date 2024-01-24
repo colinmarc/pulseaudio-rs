@@ -1,4 +1,4 @@
-use std::os::unix::net::UnixStream;
+use std::{ffi::CString, os::unix::net::UnixStream};
 
 use pulseaudio::protocol;
 
@@ -34,7 +34,10 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // The next step is to set the client name.
     let mut props = protocol::Props::new();
-    props.set(protocol::Prop::ApplicationName, "list-sinks");
+    props.set(
+        protocol::Prop::ApplicationName,
+        CString::new("list-sinks").unwrap(),
+    );
     protocol::write_command_message(
         sock.get_mut(),
         1,

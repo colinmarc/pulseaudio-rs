@@ -3,7 +3,7 @@
 
 use std::{
     collections::BTreeMap,
-    ffi::{CStr, CString},
+    ffi::{CStr, CString, FromVecWithNulError, NulError},
 };
 
 use super::*;
@@ -12,14 +12,12 @@ use crate::protocol::ProtocolError;
 /// Max. size of a proplist value in Bytes.
 const MAX_PROP_SIZE: u32 = 64 * 1024;
 
-/// A list of key-value pairs that associate arbitrary properties with an object.
-///
-/// This is a key-value mapping using UTF-8 strings as keys (specifically, ASCII keys). PulseAudio
-/// will not accept keys that contain non-ASCII data or that are empty. Values, however, can be
-/// arbitrary bytes, but also are mostly UTF-8 strings, so `PropList` provides a few helper methods
-/// for dealing with human-accessible UTF-8 strings.
+/// A list of key-value pairs that associate arbitrary properties with an
+/// object. Keys are null-terminated strings and values are arbitrary binary
+/// blobs, although by convention both are usually null-terminated ASCII
+/// strings.
 #[derive(Default, Clone, PartialEq, Eq)]
-pub struct Props(BTreeMap<String, Box<[u8]>>);
+pub struct Props(BTreeMap<Box<CStr>, Box<[u8]>>);
 
 impl Props {
     /// Creates a new, empty property list.
@@ -27,54 +25,59 @@ impl Props {
         Self::default()
     }
 
-    /// Sets a well-known property.
+    /// Sets a well-known property in the map.
     ///
     /// If the property already has a value, it will be overwritten with the new one.
     pub fn set<T>(&mut self, prop: Prop, value: T)
     where
-        T: AsRef<[u8]>,
+        T: AsRef<CStr>,
     {
-        self.0
-            .insert(prop.as_str().to_owned(), value.as_ref().into());
+        self.set_bytes(prop.to_c_str(), value.as_ref().to_bytes_with_nul());
     }
 
-    /// Insert raw data into the property list.
+    /// Sets a a property in the map.
     ///
-    /// Returns the key's previous value, if any.
-    pub fn insert(&mut self, key: String, value: Box<[u8]>) -> Option<Box<[u8]>> {
-        self.0.insert(key, value)
+    /// If the property already has a value, it will be overwritten with the new one.
+    pub fn set_bytes<K, V>(&mut self, key: K, value: V)
+    where
+        K: AsRef<CStr>,
+        V: AsRef<[u8]>,
+    {
+        self.0.insert(key.as_ref().into(), value.as_ref().into());
     }
 
-    /// Get the value of a well-known property.
+    /// Gets the value of a well-known property.
     ///
     /// If `prop` is not in the map, returns `None`.
     pub fn get(&self, prop: Prop) -> Option<&[u8]> {
-        self.0.get(prop.as_str()).map(|r| &**r)
+        self.get_bytes(prop.to_c_str())
     }
 
-    /// Get the string value associated to a well-known property.
+    /// Gets the value of a well-known property.
     ///
-    /// If `prop` is not in the map, or its associated blob is not a valid `CStr` (ie. it
-    /// contains interior nul bytes or is missing a terminating nul byte), or it is not valid UTF-8,
-    /// returns `None`.
-    ///
-    /// Note that while this guarantees that the returned value is valid UTF-8, it does not return a
-    /// `&str`, since they may contain interior nul bytes.
-    ///
-    /// This is equivalent to PA's own `pa_proplist_gets`.
-    pub fn get_c_str(&self, prop: Prop) -> Option<&CStr> {
-        let s = self
-            .get(prop)
-            .and_then(|blob| CStr::from_bytes_with_nul(blob).ok());
+    /// If `prop` is not in the map, returns `None`.
+    pub fn get_mut(&mut self, prop: Prop) -> Option<&mut [u8]> {
+        self.get_bytes_mut(prop.to_c_str())
+    }
 
-        match s {
-            Some(s) if s.to_str().is_ok() => Some(s),
-            _ => None,
-        }
+    /// Gets a property from the map.
+    pub fn get_bytes<K>(&self, key: K) -> Option<&[u8]>
+    where
+        K: AsRef<CStr>,
+    {
+        self.0.get(key.as_ref()).map(|r| &r[..])
+    }
+
+    ///s Get a property from the map.
+    pub fn get_bytes_mut<K>(&mut self, key: K) -> Option<&mut [u8]>
+    where
+        K: AsRef<CStr>,
+    {
+        self.0.get_mut(key.as_ref()).map(|r| &mut r[..])
     }
 
     /// Create an Iterator over the properties.
-    pub fn iter(&self) -> std::collections::btree_map::Iter<'_, String, Box<[u8]>> {
+    pub fn iter(&self) -> std::collections::btree_map::Iter<'_, Box<CStr>, Box<[u8]>> {
         self.0.iter()
     }
 }
@@ -330,93 +333,111 @@ pub enum Prop {
 
 impl Prop {
     /// Returns the property name to use in a property list.
-    fn as_str(&self) -> &str {
+    pub fn to_c_str(&self) -> &CStr {
         use self::Prop::*;
 
         match *self {
-            MediaName => "media.name",
-            MediaTitle => "media.title",
-            MediaArtist => "media.artist",
-            MediaCopyright => "media.copyright",
-            MediaSoftware => "media.software",
-            MediaLanguage => "media.language",
-            MediaFilename => "media.filename",
-            MediaIcon => "media.icon",
-            MediaIconName => "media.icon_name",
-            MediaRole => "media.role",
-            FilterWant => "filter.want",
-            FilterApply => "filter.apply",
-            FilterSuppress => "filter.suppress",
-            EventId => "event.id",
-            EventDescription => "event.description",
-            EventMouseX => "event.mouse.x",
-            EventMouseY => "event.mouse.y",
-            EventMouseHPos => "event.mouse.hpos",
-            EventMouseVPos => "event.mouse.vpos",
-            EventMouseButton => "event.mouse.button",
-            WindowName => "window.name",
-            WindowId => "window.id",
-            WindowIcon => "window.icon",
-            WindowIconName => "window.icon_name",
-            WindowX => "window.x",
-            WindowY => "window.y",
-            WindowWidth => "window.width",
-            WindowHeight => "window.height",
-            WindowHPos => "window.hpos",
-            WindowVPos => "window.vpos",
-            WindowDesktop => "window.desktop",
-            WindowX11Display => "window.x11.display",
-            WindowX11Screen => "window.x11.screen",
-            WindowX11Monitor => "window.x11.monitor",
-            WindowX11Xid => "window.x11.xid",
-            ApplicationName => "application.name",
-            ApplicationId => "application.id",
-            ApplicationVersion => "application.version",
-            ApplicationIcon => "application.icon",
-            ApplicationIconName => "application.icon_name",
-            ApplicationLanguage => "application.language",
-            ApplicationProcessId => "application.process.id",
-            ApplicationProcessBinary => "application.process.binary",
-            ApplicationProcessUser => "application.process.user",
-            ApplicationProcessHost => "application.process.host",
-            ApplicationProcessMachineId => "application.process.machine_id",
-            ApplicationProcessSessionId => "application.process.session_id",
-            DeviceString => "device.string",
-            DeviceApi => "device.api",
-            DeviceDescription => "device.description",
-            DeviceBusPath => "device.bus_path",
-            DeviceSerial => "device.serial",
-            DeviceVendorId => "device.vendor.id",
-            DeviceVendorName => "device.vendor.name",
-            DeviceProductId => "device.product.id",
-            DeviceProductName => "device.product.name",
-            DeviceClass => "device.class",
-            DeviceFormFactor => "device.form_factor",
-            DeviceBus => "device.bus",
-            DeviceIcon => "device.icon",
-            DeviceIconName => "device.icon_name",
-            DeviceAccessMode => "device.access_mode",
-            DeviceMasterDevice => "device.master_device",
-            DeviceBufferingBufferSize => "device.buffering.buffer_size",
-            DeviceBufferingFragmentSize => "device.buffering.fragment_size",
-            DeviceProfileName => "device.profile.name",
-            DeviceIntendedRoles => "device.intended_roles",
-            DeviceProfileDescription => "device.profile.description",
-            ModuleAuthor => "module.author",
-            ModuleDescription => "module.description",
-            ModuleUsage => "module.usage",
-            ModuleVersion => "module.version",
-            FormatSampleFormat => "format.sample_format",
-            FormatRate => "format.rate",
-            FormatChannels => "format.channels",
-            FormatChannelMap => "format.channel_map",
+            MediaName => CStr::from_bytes_with_nul(b"media.name\0").unwrap(),
+            MediaTitle => CStr::from_bytes_with_nul(b"media.title\0").unwrap(),
+            MediaArtist => CStr::from_bytes_with_nul(b"media.artist\0").unwrap(),
+            MediaCopyright => CStr::from_bytes_with_nul(b"media.copyright\0").unwrap(),
+            MediaSoftware => CStr::from_bytes_with_nul(b"media.software\0").unwrap(),
+            MediaLanguage => CStr::from_bytes_with_nul(b"media.language\0").unwrap(),
+            MediaFilename => CStr::from_bytes_with_nul(b"media.filename\0").unwrap(),
+            MediaIcon => CStr::from_bytes_with_nul(b"media.icon\0").unwrap(),
+            MediaIconName => CStr::from_bytes_with_nul(b"media.icon_name\0").unwrap(),
+            MediaRole => CStr::from_bytes_with_nul(b"media.role\0").unwrap(),
+            FilterWant => CStr::from_bytes_with_nul(b"filter.want\0").unwrap(),
+            FilterApply => CStr::from_bytes_with_nul(b"filter.apply\0").unwrap(),
+            FilterSuppress => CStr::from_bytes_with_nul(b"filter.suppress\0").unwrap(),
+            EventId => CStr::from_bytes_with_nul(b"event.id\0").unwrap(),
+            EventDescription => CStr::from_bytes_with_nul(b"event.description\0").unwrap(),
+            EventMouseX => CStr::from_bytes_with_nul(b"event.mouse.x\0").unwrap(),
+            EventMouseY => CStr::from_bytes_with_nul(b"event.mouse.y\0").unwrap(),
+            EventMouseHPos => CStr::from_bytes_with_nul(b"event.mouse.hpos\0").unwrap(),
+            EventMouseVPos => CStr::from_bytes_with_nul(b"event.mouse.vpos\0").unwrap(),
+            EventMouseButton => CStr::from_bytes_with_nul(b"event.mouse.button\0").unwrap(),
+            WindowName => CStr::from_bytes_with_nul(b"window.name\0").unwrap(),
+            WindowId => CStr::from_bytes_with_nul(b"window.id\0").unwrap(),
+            WindowIcon => CStr::from_bytes_with_nul(b"window.icon\0").unwrap(),
+            WindowIconName => CStr::from_bytes_with_nul(b"window.icon_name\0").unwrap(),
+            WindowX => CStr::from_bytes_with_nul(b"window.x\0").unwrap(),
+            WindowY => CStr::from_bytes_with_nul(b"window.y\0").unwrap(),
+            WindowWidth => CStr::from_bytes_with_nul(b"window.width\0").unwrap(),
+            WindowHeight => CStr::from_bytes_with_nul(b"window.height\0").unwrap(),
+            WindowHPos => CStr::from_bytes_with_nul(b"window.hpos\0").unwrap(),
+            WindowVPos => CStr::from_bytes_with_nul(b"window.vpos\0").unwrap(),
+            WindowDesktop => CStr::from_bytes_with_nul(b"window.desktop\0").unwrap(),
+            WindowX11Display => CStr::from_bytes_with_nul(b"window.x11.display\0").unwrap(),
+            WindowX11Screen => CStr::from_bytes_with_nul(b"window.x11.screen\0").unwrap(),
+            WindowX11Monitor => CStr::from_bytes_with_nul(b"window.x11.monitor\0").unwrap(),
+            WindowX11Xid => CStr::from_bytes_with_nul(b"window.x11.xid\0").unwrap(),
+            ApplicationName => CStr::from_bytes_with_nul(b"application.name\0").unwrap(),
+            ApplicationId => CStr::from_bytes_with_nul(b"application.id\0").unwrap(),
+            ApplicationVersion => CStr::from_bytes_with_nul(b"application.version\0").unwrap(),
+            ApplicationIcon => CStr::from_bytes_with_nul(b"application.icon\0").unwrap(),
+            ApplicationIconName => CStr::from_bytes_with_nul(b"application.icon_name\0").unwrap(),
+            ApplicationLanguage => CStr::from_bytes_with_nul(b"application.language\0").unwrap(),
+            ApplicationProcessId => CStr::from_bytes_with_nul(b"application.process.id\0").unwrap(),
+            ApplicationProcessBinary => {
+                CStr::from_bytes_with_nul(b"application.process.binary\0").unwrap()
+            }
+            ApplicationProcessUser => {
+                CStr::from_bytes_with_nul(b"application.process.user\0").unwrap()
+            }
+            ApplicationProcessHost => {
+                CStr::from_bytes_with_nul(b"application.process.host\0").unwrap()
+            }
+            ApplicationProcessMachineId => {
+                CStr::from_bytes_with_nul(b"application.process.machine_id\0").unwrap()
+            }
+            ApplicationProcessSessionId => {
+                CStr::from_bytes_with_nul(b"application.process.session_id\0").unwrap()
+            }
+            DeviceString => CStr::from_bytes_with_nul(b"device.string\0").unwrap(),
+            DeviceApi => CStr::from_bytes_with_nul(b"device.api\0").unwrap(),
+            DeviceDescription => CStr::from_bytes_with_nul(b"device.description\0").unwrap(),
+            DeviceBusPath => CStr::from_bytes_with_nul(b"device.bus_path\0").unwrap(),
+            DeviceSerial => CStr::from_bytes_with_nul(b"device.serial\0").unwrap(),
+            DeviceVendorId => CStr::from_bytes_with_nul(b"device.vendor.id\0").unwrap(),
+            DeviceVendorName => CStr::from_bytes_with_nul(b"device.vendor.name\0").unwrap(),
+            DeviceProductId => CStr::from_bytes_with_nul(b"device.product.id\0").unwrap(),
+            DeviceProductName => CStr::from_bytes_with_nul(b"device.product.name\0").unwrap(),
+            DeviceClass => CStr::from_bytes_with_nul(b"device.class\0").unwrap(),
+            DeviceFormFactor => CStr::from_bytes_with_nul(b"device.form_factor\0").unwrap(),
+            DeviceBus => CStr::from_bytes_with_nul(b"device.bus\0").unwrap(),
+            DeviceIcon => CStr::from_bytes_with_nul(b"device.icon\0").unwrap(),
+            DeviceIconName => CStr::from_bytes_with_nul(b"device.icon_name\0").unwrap(),
+            DeviceAccessMode => CStr::from_bytes_with_nul(b"device.access_mode\0").unwrap(),
+            DeviceMasterDevice => CStr::from_bytes_with_nul(b"device.master_device\0").unwrap(),
+            DeviceBufferingBufferSize => {
+                CStr::from_bytes_with_nul(b"device.buffering.buffer_size\0").unwrap()
+            }
+            DeviceBufferingFragmentSize => {
+                CStr::from_bytes_with_nul(b"device.buffering.fragment_size\0").unwrap()
+            }
+            DeviceProfileName => CStr::from_bytes_with_nul(b"device.profile.name\0").unwrap(),
+            DeviceIntendedRoles => CStr::from_bytes_with_nul(b"device.intended_roles\0").unwrap(),
+            DeviceProfileDescription => {
+                CStr::from_bytes_with_nul(b"device.profile.description\0").unwrap()
+            }
+            ModuleAuthor => CStr::from_bytes_with_nul(b"module.author\0").unwrap(),
+            ModuleDescription => CStr::from_bytes_with_nul(b"module.description\0").unwrap(),
+            ModuleUsage => CStr::from_bytes_with_nul(b"module.usage\0").unwrap(),
+            ModuleVersion => CStr::from_bytes_with_nul(b"module.version\0").unwrap(),
+            FormatSampleFormat => CStr::from_bytes_with_nul(b"format.sample_format\0").unwrap(),
+            FormatRate => CStr::from_bytes_with_nul(b"format.rate\0").unwrap(),
+            FormatChannels => CStr::from_bytes_with_nul(b"format.channels\0").unwrap(),
+            FormatChannelMap => CStr::from_bytes_with_nul(b"format.channel_map\0").unwrap(),
         }
     }
-}
 
-impl From<Prop> for CString {
-    fn from(prop: Prop) -> Self {
-        CString::new(prop.as_str()).unwrap()
+    /// Returns the property name as a string. Note that for compatibility with
+    /// existing PulseAudio implementations, property keys must be
+    /// null-terminated.
+    pub fn to_str(&self) -> &str {
+        // SAFETY: the strings above are all valid UTF-8.
+        unsafe { std::str::from_utf8_unchecked(self.to_c_str().to_bytes()) }
     }
 }
 
@@ -428,20 +449,6 @@ impl TagStructRead for Props {
         while let Some(key) = ts.read_string()? {
             if key.to_bytes().is_empty() {
                 return Err(ProtocolError::Invalid("proplist key is empty".into()));
-            }
-
-            let key = key
-                .to_str()
-                .map_err(|e| {
-                    ProtocolError::Invalid(format!("proplist key contains invalid utf-8: {}", e))
-                })?
-                .to_owned();
-
-            if !key.is_ascii() {
-                return Err(ProtocolError::Invalid(format!(
-                    "proplist key contains non-ASCII characters: {:?}",
-                    key
-                )));
             }
 
             let len = ts.read_u32()?;
@@ -461,7 +468,7 @@ impl TagStructRead for Props {
                 )));
             }
 
-            props.insert(key, value.into_boxed_slice());
+            props.set_bytes(key, value.into_boxed_slice());
         }
 
         Ok(props)
@@ -477,11 +484,6 @@ impl TagStructWrite for Props {
         w.inner.write_u8(Tag::PropList as u8)?;
 
         for (k, v) in self.iter() {
-            let k = CString::new(k.as_bytes()).map_err(|_| {
-                ProtocolError::Invalid(format!("proplist key contains nul byte: {:?}", k))
-            })?;
-            assert!(v.len() < u32::MAX as usize);
-
             w.write_string(Some(k))?;
             w.write_u32(v.len() as u32)?;
             w.write_arbitrary(v)?;
@@ -500,8 +502,8 @@ mod tests {
     #[test]
     fn props_serde() -> anyhow::Result<()> {
         let mut proplist = Props::new();
-        proplist.insert("foo".into(), vec![1, 2, 3].into());
-        proplist.set(Prop::ApplicationName, "bar");
+        proplist.set_bytes(CString::new("foo")?, &[1, 2, 3]);
+        proplist.set(Prop::ApplicationName, CString::new("bar").unwrap());
 
         test_serde_version(&proplist, MAX_VERSION)?;
         Ok(())

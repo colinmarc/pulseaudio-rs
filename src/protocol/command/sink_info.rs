@@ -419,10 +419,10 @@ mod tests {
     #[test]
     fn sink_info_list_serde() {
         let mut props1 = Props::new();
-        props1.set(Prop::DeviceString, "foo");
+        props1.set(Prop::DeviceString, CString::new("foo").unwrap());
 
         let mut props2 = Props::new();
-        props2.set(Prop::ApplicationName, "bar");
+        props2.set(Prop::ApplicationName, CString::new("bar").unwrap());
 
         let sinks = vec![
             SinkInfo {

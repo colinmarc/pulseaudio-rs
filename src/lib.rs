@@ -79,7 +79,7 @@ pub fn cookie_path_from_env() -> Option<PathBuf> {
 #[cfg(test)]
 #[cfg(feature = "_integration-tests")]
 mod integration_test_util {
-    use std::{io::BufReader, os::unix::net::UnixStream};
+    use std::{ffi::CString, io::BufReader, os::unix::net::UnixStream};
 
     use anyhow::Context;
 
@@ -125,7 +125,7 @@ mod integration_test_util {
         let protocol_version = std::cmp::min(MAX_VERSION, auth_reply.version);
 
         let mut props = Props::new();
-        props.set(Prop::ApplicationName, "pulseaudio-rs-tests");
+        props.set(Prop::ApplicationName, CString::new("pulseaudio-rs-tests")?);
         write_command_message(
             sock.get_mut(),
             1,

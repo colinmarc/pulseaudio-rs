@@ -237,7 +237,10 @@ fn connect_and_init() -> anyhow::Result<(BufReader<UnixStream>, u16)> {
     let protocol_version = std::cmp::min(protocol::MAX_VERSION, auth_reply.version);
 
     let mut props = protocol::Props::new();
-    props.set(protocol::Prop::ApplicationName, "pulseaudio-rs-playback");
+    props.set(
+        protocol::Prop::ApplicationName,
+        CString::new("pulseaudio-rs-playback").unwrap(),
+    );
     protocol::write_command_message(
         sock.get_mut(),
         1,
