@@ -236,6 +236,8 @@ impl TagStructWrite for GetSinkInfo {
     }
 }
 
+impl CommandReply for SinkInfo {}
+
 impl TagStructRead for SinkInfo {
     fn read(
         ts: &mut TagStructReader<'_>,

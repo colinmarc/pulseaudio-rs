@@ -22,7 +22,8 @@ pub const MIN_VERSION: u16 = 13;
 /// any higher version, but features added by versions higher than this are not supported.
 pub const MAX_VERSION: u16 = 32;
 
-const DESCRIPTOR_SIZE: usize = 5 * 4;
+/// The size of a message header.
+pub const DESCRIPTOR_SIZE: usize = 5 * 4;
 
 bitflags! {
     /// Special message types.

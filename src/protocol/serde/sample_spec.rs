@@ -10,7 +10,11 @@ pub const CHANNELS_MAX: u8 = 32;
 
 /// Describes how individual samples are encoded.
 #[derive(Debug, Copy, Clone, Primitive, PartialEq, Eq, Default)]
+#[repr(u8)]
 pub enum SampleFormat {
+    /// Invalid or unspecified.
+    #[default]
+    Invalid = u8::MAX,
     /// Unsigned 8 Bit PCM
     U8 = 0,
     /// 8 Bit a-Law
@@ -18,7 +22,6 @@ pub enum SampleFormat {
     /// 8 Bit mu-Law
     Ulaw = 2,
     /// Signed 16 Bit PCM, little endian (PC)
-    #[default]
     S16Le = 3,
     /// Signed 16 Bit PCM, big endian
     S16Be = 4,
@@ -44,6 +47,7 @@ impl SampleFormat {
     /// Returns the number of bytes used to store a single sample.
     pub fn bytes_per_sample(&self) -> usize {
         match self {
+            SampleFormat::Invalid => 0,
             SampleFormat::U8 => 1,
             SampleFormat::Alaw => 1,
             SampleFormat::Ulaw => 1,

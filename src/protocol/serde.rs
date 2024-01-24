@@ -376,12 +376,6 @@ pub trait TagStructWrite {
 /// Implemented by types that can be deserialized from a tagstruct stream.
 pub trait TagStructRead: Sized {
     /// Read an instance of `Self` from a tagstruct.
-    ///
-    /// # Parameters
-    ///
-    /// * `ts`: The tagstruct to read from.
-    /// * `protocol_version`: PulseAudio protocol version, used to decide on the precise data
-    ///   format. For old versions, default values might be used for parts of `Self`.
     fn read(ts: &mut TagStructReader<'_>, protocol_version: u16) -> Result<Self, ProtocolError>;
 }
 
