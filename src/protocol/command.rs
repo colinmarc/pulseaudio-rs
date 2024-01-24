@@ -304,8 +304,8 @@ impl Command {
             CommandTag::CreateUploadStream => Ok(Command::CreateUploadStream(ts.read()?)),
             CommandTag::DeleteUploadStream => Ok(Command::DeleteUploadStream(ts.read_u32()?)),
             CommandTag::FinishUploadStream => Ok(Command::FinishUploadStream(ts.read_u32()?)),
-            CommandTag::PlaySample => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::RemoveSample => Err(ProtocolError::Unimplemented(command)),
+            CommandTag::PlaySample => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::RemoveSample => Err(ProtocolError::Unimplemented(seq, command)),
 
             CommandTag::GetServerInfo => Ok(Command::GetServerInfo),
             CommandTag::GetSinkInfo => Ok(Command::GetSinkInfo(ts.read()?)),
@@ -335,70 +335,86 @@ impl Command {
                 Ok(Command::PlaybackBufferAttrChanged(ts.read()?))
             }
 
-            CommandTag::SetSinkVolume => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetSinkInputVolume => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetSourceVolume => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetSinkMute => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetSourceMute => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::CorkPlaybackStream => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::FlushPlaybackStream => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::TriggerPlaybackStream => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetDefaultSink => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetDefaultSource => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetPlaybackStreamName => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetRecordStreamName => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::KillClient => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::KillSinkInput => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::KillSourceOutput => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::LoadModule => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::UnloadModule => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::AddAutoloadObsolete => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::RemoveAutoloadObsolete => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::GetAutoloadInfoObsolete => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::GetAutoloadInfoListObsolete => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::GetRecordLatency => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::CorkRecordStream => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::FlushRecordStream => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::PrebufPlaybackStream => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::MoveSinkInput => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::MoveSourceOutput => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetSinkInputMute => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SuspendSink => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SuspendSource => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetPlaybackStreamBufferAttr => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetRecordStreamBufferAttr => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::UpdatePlaybackStreamSampleRate => {
-                Err(ProtocolError::Unimplemented(command))
+            CommandTag::SetSinkVolume => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetSinkInputVolume => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetSourceVolume => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetSinkMute => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetSourceMute => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::CorkPlaybackStream => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::FlushPlaybackStream => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::TriggerPlaybackStream => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetDefaultSink => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetDefaultSource => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetPlaybackStreamName => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetRecordStreamName => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::KillClient => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::KillSinkInput => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::KillSourceOutput => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::LoadModule => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::UnloadModule => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::AddAutoloadObsolete => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::RemoveAutoloadObsolete => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::GetAutoloadInfoObsolete => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::GetAutoloadInfoListObsolete => {
+                Err(ProtocolError::Unimplemented(seq, command))
             }
-            CommandTag::UpdateRecordStreamSampleRate => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::PlaybackStreamSuspended => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::RecordStreamSuspended => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::PlaybackStreamMoved => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::RecordStreamMoved => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::UpdateRecordStreamProplist => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::UpdatePlaybackStreamProplist => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::UpdateClientProplist => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::RemoveRecordStreamProplist => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::RemovePlaybackStreamProplist => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::RemoveClientProplist => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::Extension => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::GetCardInfo => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::GetCardInfoList => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetCardProfile => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::ClientEvent => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::PlaybackStreamEvent => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::RecordStreamEvent => Err(ProtocolError::Unimplemented(command)),
+            CommandTag::GetRecordLatency => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::CorkRecordStream => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::FlushRecordStream => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::PrebufPlaybackStream => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::MoveSinkInput => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::MoveSourceOutput => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetSinkInputMute => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SuspendSink => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SuspendSource => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetPlaybackStreamBufferAttr => {
+                Err(ProtocolError::Unimplemented(seq, command))
+            }
+            CommandTag::SetRecordStreamBufferAttr => {
+                Err(ProtocolError::Unimplemented(seq, command))
+            }
+            CommandTag::UpdatePlaybackStreamSampleRate => {
+                Err(ProtocolError::Unimplemented(seq, command))
+            }
+            CommandTag::UpdateRecordStreamSampleRate => {
+                Err(ProtocolError::Unimplemented(seq, command))
+            }
+            CommandTag::PlaybackStreamSuspended => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::RecordStreamSuspended => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::PlaybackStreamMoved => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::RecordStreamMoved => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::UpdateRecordStreamProplist => {
+                Err(ProtocolError::Unimplemented(seq, command))
+            }
+            CommandTag::UpdatePlaybackStreamProplist => {
+                Err(ProtocolError::Unimplemented(seq, command))
+            }
+            CommandTag::UpdateClientProplist => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::RemoveRecordStreamProplist => {
+                Err(ProtocolError::Unimplemented(seq, command))
+            }
+            CommandTag::RemovePlaybackStreamProplist => {
+                Err(ProtocolError::Unimplemented(seq, command))
+            }
+            CommandTag::RemoveClientProplist => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::Extension => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::GetCardInfo => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::GetCardInfoList => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetCardProfile => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::ClientEvent => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::PlaybackStreamEvent => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::RecordStreamEvent => Err(ProtocolError::Unimplemented(seq, command)),
 
-            CommandTag::RecordBufferAttrChanged => Err(ProtocolError::Unimplemented(command)),
+            CommandTag::RecordBufferAttrChanged => Err(ProtocolError::Unimplemented(seq, command)),
 
-            CommandTag::SetSinkPort => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetSourcePort => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetSourceOutputVolume => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetSourceOutputMute => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::SetPortLatencyOffset => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::EnableSrbchannel => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::DisableSrbchannel => Err(ProtocolError::Unimplemented(command)),
-            CommandTag::RegisterMemfdShmid => Err(ProtocolError::Unimplemented(command)),
+            CommandTag::SetSinkPort => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetSourcePort => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetSourceOutputVolume => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetSourceOutputMute => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetPortLatencyOffset => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::EnableSrbchannel => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::DisableSrbchannel => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::RegisterMemfdShmid => Err(ProtocolError::Unimplemented(seq, command)),
         }?;
 
         Ok((seq, cmd))

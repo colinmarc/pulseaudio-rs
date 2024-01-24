@@ -21,8 +21,8 @@ pub enum ProtocolError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     /// The command is not yet implemented.
-    #[error("unimplemented command: {0:?}")]
-    Unimplemented(CommandTag),
+    #[error("unimplemented command: {1:?}")]
+    Unimplemented(u32, CommandTag),
     /// An error from a remote server.
     #[error("server error: {0:?}")]
     ServerError(PulseError),
