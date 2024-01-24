@@ -54,10 +54,8 @@ use enum_primitive_derive::Primitive;
 pub enum CommandTag {
     /* Generic commands */
     Error = 0,
-    Timeout = 1, /* pseudo command */
-    Reply = 2,   /* actually used for command replies */
-
-    /* CLIENT->SERVER */
+    Timeout = 1,              /* pseudo command */
+    Reply = 2,                /* actually used for command replies */
     CreatePlaybackStream = 3, /* Payload changed in v9, v12 (0.9.0, 0.9.8) */
     DeletePlaybackStream = 4,
     CreateRecordStream = 5, /* Payload changed in v9, v12 (0.9.0, 0.9.8) */
@@ -75,7 +73,6 @@ pub enum CommandTag {
     FinishUploadStream = 17,
     PlaySample = 18,
     RemoveSample = 19,
-
     GetServerInfo = 20,
     GetSinkInfo = 21,
     GetSinkInfoList = 22,
@@ -92,121 +89,75 @@ pub enum CommandTag {
     GetSampleInfo = 33,
     GetSampleInfoList = 34,
     Subscribe = 35,
-
     SetSinkVolume = 36,
     SetSinkInputVolume = 37,
     SetSourceVolume = 38,
-
     SetSinkMute = 39,
     SetSourceMute = 40,
-
     CorkPlaybackStream = 41,
     FlushPlaybackStream = 42,
     TriggerPlaybackStream = 43,
-
     SetDefaultSink = 44,
     SetDefaultSource = 45,
-
     SetPlaybackStreamName = 46,
     SetRecordStreamName = 47,
-
     KillClient = 48,
     KillSinkInput = 49,
     KillSourceOutput = 50,
-
     LoadModule = 51,
     UnloadModule = 52,
-
-    /* Obsolete */
     AddAutoloadObsolete = 53,
     RemoveAutoloadObsolete = 54,
     GetAutoloadInfoObsolete = 55,
     GetAutoloadInfoListObsolete = 56,
-
     GetRecordLatency = 57,
     CorkRecordStream = 58,
     FlushRecordStream = 59,
     PrebufPlaybackStream = 60,
-
-    /* SERVER->CLIENT */
     Request = 61,
     Overflow = 62,
     Underflow = 63,
     PlaybackStreamKilled = 64,
     RecordStreamKilled = 65,
     SubscribeEvent = 66,
-
-    /* A few more client->server commands */
-
-    /* Supported since protocol v10 (0.9.5) */
     MoveSinkInput = 67,
     MoveSourceOutput = 68,
-
-    /* Supported since protocol v11 (0.9.7) */
     SetSinkInputMute = 69,
-
     SuspendSink = 70,
     SuspendSource = 71,
-
-    /* Supported since protocol v12 (0.9.8) */
     SetPlaybackStreamBufferAttr = 72,
     SetRecordStreamBufferAttr = 73,
-
     UpdatePlaybackStreamSampleRate = 74,
     UpdateRecordStreamSampleRate = 75,
-
-    /* SERVER->CLIENT */
     PlaybackStreamSuspended = 76,
     RecordStreamSuspended = 77,
     PlaybackStreamMoved = 78,
     RecordStreamMoved = 79,
-
-    /* Supported since protocol v13 (0.9.11) */
     UpdateRecordStreamProplist = 80,
     UpdatePlaybackStreamProplist = 81,
     UpdateClientProplist = 82,
     RemoveRecordStreamProplist = 83,
     RemovePlaybackStreamProplist = 84,
     RemoveClientProplist = 85,
-
-    /* SERVER->CLIENT */
     Started = 86,
-
-    /* Supported since protocol v14 (0.9.12) */
     Extension = 87,
-
-    /* Supported since protocol v15 (0.9.15) */
     GetCardInfo = 88,
     GetCardInfoList = 89,
     SetCardProfile = 90,
-
     ClientEvent = 91,
     PlaybackStreamEvent = 92,
     RecordStreamEvent = 93,
-
-    /* SERVER->CLIENT */
     PlaybackBufferAttrChanged = 94,
     RecordBufferAttrChanged = 95,
-
-    /* Supported since protocol v16 (0.9.16) */
     SetSinkPort = 96,
     SetSourcePort = 97,
-
-    /* Supported since protocol v22 (1.0) */
     SetSourceOutputVolume = 98,
     SetSourceOutputMute = 99,
-
-    /* Supported since protocol v27 (3.0) */
     SetPortLatencyOffset = 100,
-
-    /* Supported since protocol v30 (6.0) */
-    /* BOTH DIRECTIONS */
     EnableSrbchannel = 101,
     DisableSrbchannel = 102,
-
-    /* Supported since protocol v31 (9.0)
-     * BOTH DIRECTIONS */
     RegisterMemfdShmid = 103,
+    SendObjectMessage = 104,
 }
 
 /// A marker trait for reply data.
@@ -220,7 +171,7 @@ pub enum Command {
     Timeout,
     Exit,
 
-    // A reply to some other command. If this is returned by [`Command::read_tag_prefixed`], the payload has yet to be read.
+    /// A reply to some other command. If this is returned by [`Command::read_tag_prefixed`], the payload has yet to be read.
     Reply,
 
     // Authentication request (and protocol handshake).
@@ -415,6 +366,7 @@ impl Command {
             CommandTag::EnableSrbchannel => Err(ProtocolError::Unimplemented(seq, command)),
             CommandTag::DisableSrbchannel => Err(ProtocolError::Unimplemented(seq, command)),
             CommandTag::RegisterMemfdShmid => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SendObjectMessage => Err(ProtocolError::Unimplemented(seq, command)),
         }?;
 
         Ok((seq, cmd))

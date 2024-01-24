@@ -20,7 +20,7 @@ pub const MIN_VERSION: u16 = 13;
 ///
 /// This library can still work with clients and servers down to `PROTOCOL_MIN_VERSION` and up to
 /// any higher version, but features added by versions higher than this are not supported.
-pub const MAX_VERSION: u16 = 32;
+pub const MAX_VERSION: u16 = 35;
 
 /// The size of a message header.
 pub const DESCRIPTOR_SIZE: usize = 5 * 4;

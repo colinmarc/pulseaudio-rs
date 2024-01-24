@@ -3,7 +3,7 @@
 
 use std::{
     collections::BTreeMap,
-    ffi::{CStr, CString, FromVecWithNulError, NulError},
+    ffi::{CStr, CString},
 };
 
 use super::*;
@@ -502,7 +502,7 @@ mod tests {
     #[test]
     fn props_serde() -> anyhow::Result<()> {
         let mut proplist = Props::new();
-        proplist.set_bytes(CString::new("foo")?, &[1, 2, 3]);
+        proplist.set_bytes(CString::new("foo")?, [1, 2, 3]);
         proplist.set(Prop::ApplicationName, CString::new("bar").unwrap());
 
         test_serde_version(&proplist, MAX_VERSION)?;

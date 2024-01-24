@@ -2,6 +2,7 @@
 
 pub mod channel_map;
 pub mod format_info;
+pub mod port_info;
 pub mod props;
 pub mod sample_spec;
 pub mod stream;

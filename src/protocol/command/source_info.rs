@@ -2,7 +2,7 @@ use std::ffi::CString;
 
 use enum_primitive_derive::Primitive;
 
-use crate::protocol::{serde::*, *};
+use crate::protocol::{port_info::*, *};
 
 /// The state of a source.
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Primitive)]
@@ -166,12 +166,20 @@ impl TagStructRead for SourceInfo {
                     PortAvailable::Unknown
                 };
 
+                let (availability_group, port_type) = if protocol_version >= 34 {
+                    (ts.read_string()?, ts.read_enum()?)
+                } else {
+                    (None, PortType::Unknown)
+                };
+
                 source.ports.push(PortInfo {
                     name: name.unwrap_or_default().to_owned(),
+                    port_type,
                     description,
-                    dir: Direction::Output,
+                    dir: PortDirection::Output,
                     priority,
                     available,
+                    availability_group,
                 });
             }
 

@@ -3,7 +3,8 @@
 use std::ffi::CString;
 
 use super::CommandReply;
-use crate::protocol::{serde::*, *};
+
+use crate::protocol::{port_info::*, *};
 
 use bitflags::bitflags;
 use enum_primitive_derive::Primitive;
@@ -53,46 +54,6 @@ pub enum SinkState {
     // FIXME: Is this what pasuspender uses?
     #[default]
     Suspended = 2,
-}
-
-/// Specifies the direction of a port.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum Direction {
-    /// The port is an input, ie. part of a source.
-    Input,
-    /// The port is an output, ie. part of a sink.
-    Output,
-}
-
-/// Port availability status.
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Primitive)]
-pub enum PortAvailable {
-    /// This port does not support jack detection.
-    #[default]
-    Unknown = 0,
-    /// This port is not available, likely because the jack is not plugged in. \since 2.0
-    No = 1,
-    /// This port is available, likely because the jack is plugged in. \since 2.0
-    Yes = 2,
-}
-
-/// A port on a sink or source.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct PortInfo {
-    /// The name of the port.
-    pub name: CString,
-
-    /// A description of the port.
-    pub description: Option<CString>,
-
-    /// The direction of the port.
-    pub dir: Direction,
-
-    /// The priority of the port.
-    pub priority: u32,
-
-    /// Whether the port is available.
-    pub available: PortAvailable,
 }
 
 /// A sink connected to a PulseAudio server.
@@ -192,10 +153,12 @@ impl SinkInfo {
             flags: SinkFlags::empty(),
             ports: vec![PortInfo {
                 name: CString::new("Stereo Output").unwrap(),
+                port_type: PortType::Unknown,
                 description: None,
-                dir: Direction::Output,
+                dir: PortDirection::Output,
                 priority: 0,
                 available: PortAvailable::Yes,
+                availability_group: None,
             }],
             active_port: 0,
             formats: vec![FormatInfo::new(FormatEncoding::Pcm)],
@@ -289,12 +252,20 @@ impl TagStructRead for SinkInfo {
                     PortAvailable::Unknown
                 };
 
+                let (availability_group, port_type) = if protocol_version >= 34 {
+                    (ts.read_string()?, ts.read_enum()?)
+                } else {
+                    (None, PortType::Unknown)
+                };
+
                 sink.ports.push(PortInfo {
                     name: name.unwrap_or_default().to_owned(),
                     description,
-                    dir: Direction::Input,
+                    dir: PortDirection::Input,
                     priority,
                     available,
+                    availability_group,
+                    port_type,
                 });
             }
 
