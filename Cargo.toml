@@ -6,6 +6,9 @@ version = "0.1.1"
 authors = ["Colin Marc <hi@colinmarc.com>", "Jonas Schievink <jonasschievink@gmail.com>"]
 license = "MIT"
 
+[workspace]
+members = ["patrace"]
+
 [dependencies]
 bitflags = "2.4.1"
 byteorder = "1.5.0"
