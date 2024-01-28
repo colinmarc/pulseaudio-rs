@@ -8,6 +8,8 @@
 
 use enum_primitive_derive::Primitive;
 
+use super::*;
+
 /// The direction of a stream.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum StreamDirection {
@@ -201,5 +203,53 @@ impl Default for BufferAttr {
             minimum_request_length: u32::MAX,
             fragment_size: u32::MAX,
         }
+    }
+}
+
+/// Parameters for a cork/uncork command.
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
+pub struct CorkStreamParams {
+    /// The channel to cork or uncork.
+    pub channel: u32,
+
+    /// Whether to cork or uncork the stream.
+    pub cork: bool,
+}
+
+impl TagStructRead for CorkStreamParams {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
+        Ok(Self {
+            channel: ts
+                .read_index()?
+                .ok_or_else(|| ProtocolError::Invalid("invalid channel index".to_string()))?,
+            cork: ts.read_bool()?,
+        })
+    }
+}
+
+impl TagStructWrite for CorkStreamParams {
+    fn write(
+        &self,
+        ts: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
+        ts.write_index(Some(self.channel))?;
+        ts.write_bool(self.cork)?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cork_params_serde() -> anyhow::Result<()> {
+        let params = CorkStreamParams {
+            channel: 0,
+            cork: true,
+        };
+
+        test_util::test_serde(&params)
     }
 }

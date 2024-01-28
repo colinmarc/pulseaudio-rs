@@ -180,7 +180,7 @@ pub enum Command {
     // Updates client properties (not just the name).
     SetClientName(Props),
 
-    // Create and delete streams.
+    // Create and manage streams.
     CreatePlaybackStream(PlaybackStreamParams),
     DeletePlaybackStream(u32),
     CreateRecordStream(RecordStreamParams),
@@ -191,6 +191,14 @@ pub enum Command {
     CreateUploadStream(UploadStreamParams),
     DeleteUploadStream(u32),
     FinishUploadStream(u32),
+    UpdatePlaybackStreamProplist(UpdatePropsParams),
+    UpdateRecordStreamProplist(UpdatePropsParams),
+    CorkPlaybackStream(CorkStreamParams),
+    CorkRecordStream(CorkStreamParams),
+    FlushPlaybackStream(u32),
+    FlushRecordStream(u32),
+    PrebufPlaybackStream(u32),
+    TriggerPlaybackStream(u32),
 
     // So-called introspection commands, to read back the state of the server.
     Stat,
@@ -291,9 +299,9 @@ impl Command {
             CommandTag::SetSourceVolume => Err(ProtocolError::Unimplemented(seq, command)),
             CommandTag::SetSinkMute => Err(ProtocolError::Unimplemented(seq, command)),
             CommandTag::SetSourceMute => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::CorkPlaybackStream => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::FlushPlaybackStream => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::TriggerPlaybackStream => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::CorkPlaybackStream => Ok(Command::CorkPlaybackStream(ts.read()?)),
+            CommandTag::FlushPlaybackStream => Ok(Command::FlushPlaybackStream(ts.read_u32()?)),
+            CommandTag::TriggerPlaybackStream => Ok(Command::TriggerPlaybackStream(ts.read_u32()?)),
             CommandTag::SetDefaultSink => Err(ProtocolError::Unimplemented(seq, command)),
             CommandTag::SetDefaultSource => Err(ProtocolError::Unimplemented(seq, command)),
             CommandTag::SetPlaybackStreamName => Err(ProtocolError::Unimplemented(seq, command)),
@@ -310,8 +318,8 @@ impl Command {
                 Err(ProtocolError::Unimplemented(seq, command))
             }
             CommandTag::GetRecordLatency => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::CorkRecordStream => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::FlushRecordStream => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::CorkRecordStream => Ok(Command::CorkRecordStream(ts.read()?)),
+            CommandTag::FlushRecordStream => Ok(Command::FlushRecordStream(ts.read_u32()?)),
             CommandTag::PrebufPlaybackStream => Err(ProtocolError::Unimplemented(seq, command)),
             CommandTag::MoveSinkInput => Err(ProtocolError::Unimplemented(seq, command)),
             CommandTag::MoveSourceOutput => Err(ProtocolError::Unimplemented(seq, command)),
@@ -335,10 +343,10 @@ impl Command {
             CommandTag::PlaybackStreamMoved => Err(ProtocolError::Unimplemented(seq, command)),
             CommandTag::RecordStreamMoved => Err(ProtocolError::Unimplemented(seq, command)),
             CommandTag::UpdateRecordStreamProplist => {
-                Err(ProtocolError::Unimplemented(seq, command))
+                Ok(Command::UpdateRecordStreamProplist(ts.read()?))
             }
             CommandTag::UpdatePlaybackStreamProplist => {
-                Err(ProtocolError::Unimplemented(seq, command))
+                Ok(Command::UpdatePlaybackStreamProplist(ts.read()?))
             }
             CommandTag::UpdateClientProplist => Err(ProtocolError::Unimplemented(seq, command)),
             CommandTag::RemoveRecordStreamProplist => {
@@ -408,6 +416,14 @@ impl Command {
             Command::CreateUploadStream(_) => CommandTag::CreateUploadStream,
             Command::DeleteUploadStream(_) => CommandTag::DeleteUploadStream,
             Command::FinishUploadStream(_) => CommandTag::FinishUploadStream,
+            Command::UpdatePlaybackStreamProplist(_) => CommandTag::UpdatePlaybackStreamProplist,
+            Command::UpdateRecordStreamProplist(_) => CommandTag::UpdateRecordStreamProplist,
+            Command::CorkPlaybackStream(_) => CommandTag::CorkPlaybackStream,
+            Command::CorkRecordStream(_) => CommandTag::CorkRecordStream,
+            Command::FlushPlaybackStream(_) => CommandTag::FlushPlaybackStream,
+            Command::FlushRecordStream(_) => CommandTag::FlushRecordStream,
+            Command::PrebufPlaybackStream(_) => CommandTag::PrebufPlaybackStream,
+            Command::TriggerPlaybackStream(_) => CommandTag::TriggerPlaybackStream,
 
             Command::Stat => CommandTag::Stat,
             Command::GetServerInfo => CommandTag::GetServerInfo,
@@ -466,6 +482,14 @@ impl TagStructWrite for Command {
             Command::CreateUploadStream(ref p) => w.write(p),
             Command::DeleteUploadStream(chan) => w.write_u32(*chan),
             Command::FinishUploadStream(chan) => w.write_u32(*chan),
+            Command::UpdatePlaybackStreamProplist(ref p) => w.write(p),
+            Command::UpdateRecordStreamProplist(ref p) => w.write(p),
+            Command::CorkPlaybackStream(ref p) => w.write(p),
+            Command::CorkRecordStream(ref p) => w.write(p),
+            Command::FlushPlaybackStream(chan) => w.write_u32(*chan),
+            Command::FlushRecordStream(chan) => w.write_u32(*chan),
+            Command::PrebufPlaybackStream(chan) => w.write_u32(*chan),
+            Command::TriggerPlaybackStream(chan) => w.write_u32(*chan),
 
             Command::Stat => Ok(()),
             Command::GetServerInfo => Ok(()),

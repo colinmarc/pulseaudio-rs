@@ -10,8 +10,10 @@ pub mod volume;
 
 pub use channel_map::{ChannelMap, ChannelPosition};
 pub use format_info::*;
+pub use props::UpdatePropsParams;
 pub use props::{Prop, Props};
 pub use sample_spec::{SampleFormat, SampleSpec};
+pub use stream::CorkStreamParams;
 pub use volume::{ChannelVolume, Volume};
 
 use super::ProtocolError;
