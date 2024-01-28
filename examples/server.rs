@@ -393,6 +393,13 @@ fn handle_stream_write(
         if needed > 0 {
             stream.state = StreamState::Prebuffering(needed)
         } else {
+            protocol::write_command_message(
+                &mut client.socket,
+                u32::MAX,
+                protocol::Command::Started(desc.channel),
+                client.protocol_version,
+            )?;
+
             stream.state = StreamState::Playing
         }
     }
