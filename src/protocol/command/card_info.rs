@@ -82,8 +82,8 @@ pub struct CardInfo {
     /// A list of available profiles for the card.
     pub profiles: Vec<CardProfileInfo>,
 
-    /// The index of the currently active profile.
-    pub active_profile: usize,
+    /// The name of the currently active profile.
+    pub active_profile: Option<CString>,
 }
 
 impl CommandReply for CardInfo {}
@@ -114,11 +114,7 @@ impl TagStructRead for CardInfo {
             });
         }
 
-        let active_profile = ts
-            .read_string()?
-            .and_then(|name| profiles.iter().position(|profile| profile.name == name))
-            .unwrap_or_default();
-
+        let active_profile = ts.read_string()?;
         let props = ts.read()?;
 
         let mut ports = Vec::new();
@@ -181,35 +177,6 @@ impl TagStructRead for CardInfo {
     }
 }
 
-/// The server reply to [`super::Command::GetCardInfoList`].
-pub type CardInfoList = Vec<CardInfo>;
-
-impl CommandReply for CardInfoList {}
-
-impl TagStructRead for CardInfoList {
-    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
-        let mut cards = Vec::new();
-        while ts.has_data_left()? {
-            cards.push(ts.read()?);
-        }
-
-        Ok(cards)
-    }
-}
-
-impl TagStructWrite for CardInfoList {
-    fn write(
-        &self,
-        w: &mut TagStructWriter<'_>,
-        _protocol_version: u16,
-    ) -> Result<(), ProtocolError> {
-        for card in self {
-            w.write(card)?;
-        }
-        Ok(())
-    }
-}
-
 impl TagStructWrite for CardInfo {
     fn write(
         &self,
@@ -233,8 +200,7 @@ impl TagStructWrite for CardInfo {
             }
         }
 
-        ts.write_string(self.profiles.get(self.active_profile).map(|p| &p.name))?;
-
+        ts.write_string(self.active_profile.as_ref())?;
         ts.write(&self.props)?;
 
         if protocol_version >= 26 {
@@ -262,6 +228,35 @@ impl TagStructWrite for CardInfo {
             }
         }
 
+        Ok(())
+    }
+}
+
+/// The server reply to [`super::Command::GetCardInfoList`].
+pub type CardInfoList = Vec<CardInfo>;
+
+impl CommandReply for CardInfoList {}
+
+impl TagStructRead for CardInfoList {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
+        let mut cards = Vec::new();
+        while ts.has_data_left()? {
+            cards.push(ts.read()?);
+        }
+
+        Ok(cards)
+    }
+}
+
+impl TagStructWrite for CardInfoList {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
+        for card in self {
+            w.write(card)?;
+        }
         Ok(())
     }
 }
@@ -313,7 +308,7 @@ mod tests {
                 num_sinks: 1,
                 num_sources: 1,
             }],
-            active_profile: 0,
+            active_profile: Some(CString::new("profile1").unwrap()),
         };
 
         test_serde_version(&info, protocol::MAX_VERSION)
@@ -327,7 +322,7 @@ mod integration_tests {
     use crate::{integration_test_util::*, protocol};
 
     #[test]
-    fn get_card_info() -> anyhow::Result<()> {
+    fn get_card_info_list() -> anyhow::Result<()> {
         let (mut sock, protocol_version) = connect_and_init()?;
 
         protocol::write_command_message(
