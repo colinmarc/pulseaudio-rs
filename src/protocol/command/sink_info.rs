@@ -1,5 +1,3 @@
-//! The `GET_*_INFO` and `GET_*_INFO_LIST` commands.
-
 use std::ffi::CString;
 
 use super::CommandReply;
@@ -56,13 +54,7 @@ pub enum SinkState {
     Suspended = 2,
 }
 
-/// A sink connected to a PulseAudio server.
-///
-/// Every sink can have any number of Sink Inputs, or streams connected to it. If more than one
-/// input is connected, the inputs will be mixed together.
-///
-/// A sink always has a single configured sample spec, and all sink inputs are converted to that
-/// format (using resampling to match the sample rates, if necessary).
+/// A sink connected to a PulseAudio server. if necessary).
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct SinkInfo {
     /// Server-internal sink ID.

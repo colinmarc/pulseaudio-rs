@@ -6,42 +6,68 @@ use std::{
 };
 
 mod auth;
+mod card_info;
+mod client_event;
 mod client_info;
+mod extension;
+mod load_module;
 mod lookup;
 mod module_info;
+mod move_stream;
 mod playback_stream;
-mod playback_stream_events;
 mod record_stream;
+mod sample;
 mod sample_info;
 mod server_info;
+mod set_card_profile;
 mod set_client_name;
+mod set_port;
+mod set_port_latency_offset;
 mod sink_info;
 mod sink_input_info;
 mod source_info;
 mod source_output_info;
 mod stat;
+mod stream_events;
 mod subscribe;
+mod suspend;
 mod timing_info;
+mod update_client;
+mod update_stream;
 mod upload_stream;
+mod volume;
 
 pub use auth::*;
+pub use card_info::*;
+pub use client_event::*;
 pub use client_info::*;
+pub use extension::*;
+pub use load_module::*;
 pub use lookup::*;
 pub use module_info::*;
+pub use move_stream::*;
 pub use playback_stream::*;
-pub use playback_stream_events::*;
 pub use record_stream::*;
+pub use sample::*;
 pub use sample_info::*;
 pub use server_info::*;
+pub use set_card_profile::*;
 pub use set_client_name::*;
+pub use set_port::*;
+pub use set_port_latency_offset::*;
 pub use sink_info::*;
 pub use sink_input_info::*;
 pub use source_info::*;
 pub use source_output_info::*;
 pub use stat::*;
+pub use stream_events::*;
 pub use subscribe::*;
+pub use suspend::*;
 pub use timing_info::*;
+pub use update_client::*;
+pub use update_stream::*;
 pub use upload_stream::*;
+pub use volume::*;
 
 use super::{serde::*, ProtocolError, PulseError};
 
@@ -106,10 +132,10 @@ pub enum CommandTag {
     KillSourceOutput = 50,
     LoadModule = 51,
     UnloadModule = 52,
-    AddAutoloadObsolete = 53,
-    RemoveAutoloadObsolete = 54,
-    GetAutoloadInfoObsolete = 55,
-    GetAutoloadInfoListObsolete = 56,
+    // AddAutoloadObsolete = 53,
+    // RemoveAutoloadObsolete = 54,
+    // GetAutoloadInfoObsolete = 55,
+    // GetAutoloadInfoListObsolete = 56,
     GetRecordLatency = 57,
     CorkRecordStream = 58,
     FlushRecordStream = 59,
@@ -191,18 +217,28 @@ pub enum Command {
     CreateUploadStream(UploadStreamParams),
     DeleteUploadStream(u32),
     FinishUploadStream(u32),
-    UpdatePlaybackStreamProplist(UpdatePropsParams),
-    UpdateRecordStreamProplist(UpdatePropsParams),
     CorkPlaybackStream(CorkStreamParams),
     CorkRecordStream(CorkStreamParams),
     FlushPlaybackStream(u32),
     FlushRecordStream(u32),
     PrebufPlaybackStream(u32),
     TriggerPlaybackStream(u32),
+    SetPlaybackStreamName(SetStreamNameParams),
+    SetRecordStreamName(SetStreamNameParams),
+    SetPlaybackStreamBufferAttr(SetPlaybackStreamBufferAttrParams),
+    SetRecordStreamBufferAttr(SetRecordStreamBufferAttrParams),
+    UpdatePlaybackStreamProplist(UpdatePropsParams),
+    UpdateRecordStreamProplist(UpdatePropsParams),
+    RemovePlaybackStreamProplist(u32),
+    RemoveRecordStreamProplist(u32),
+    UpdatePlaybackStreamSampleRate(UpdateSampleRateParams),
+    UpdateRecordStreamSampleRate(UpdateSampleRateParams),
 
     // So-called introspection commands, to read back the state of the server.
     Stat,
     GetServerInfo,
+    GetCardInfo(u32),
+    GetCardInfoList,
     GetSinkInfo(GetSinkInfo),
     GetSinkInfoList,
     GetSourceInfo(GetSourceInfo),
@@ -217,18 +253,62 @@ pub enum Command {
     GetSourceOutputInfoList,
     GetSampleInfo(u32),
     GetSampleInfoList,
-    Subscribe(SubscriptionMask),
     LookupSink(CString),
     LookupSource(CString),
+    Subscribe(SubscriptionMask),
+
+    // Server management commands.
+    SetDefaultSink(CString),
+    SetDefaultSource(CString),
+    SetSinkPort(SetPortParams),
+    SetSourcePort(SetPortParams),
+    SetCardProfile(SetCardProfileParams),
+    KillClient(u32),
+    KillSinkInput(u32),
+    KillSourceOutput(u32),
+    MoveSinkInput(MoveStreamParams),
+    MoveSourceOutput(MoveStreamParams),
+    SuspendSink(SuspendParams),
+    SuspendSource(SuspendParams),
+    UpdateClientProplist(UpdateClientProplistParams),
+    RemoveClientProplist,
+    SetPortLatencyOffset(SetPortLatencyOffsetParams),
+
+    // Manage samples.
+    PlaySample(PlaySampleParams),
+    RemoveSample(CString),
+
+    // Manage modules.
+    LoadModule(LoadModuleParams),
+    UnloadModule(u32),
+    Extension(ExtensionParams),
+
+    // Set volume and mute.
+    SetSinkVolume(SetDeviceVolumeParams),
+    SetSinkInputVolume(SetStreamVolumeParams),
+    SetSourceVolume(SetDeviceVolumeParams),
+    SetSourceOutputVolume(SetStreamVolumeParams),
+    SetSinkMute(SetDeviceMuteParams),
+    SetSinkInputMute(SetStreamMuteParams),
+    SetSourceMute(SetDeviceMuteParams),
+    SetSourceOutputMute(SetStreamMuteParams),
 
     // Events from the server to the client.
+    Started(u32),
     Request(Request),
     Overflow(u32),
     Underflow(Underflow),
     PlaybackStreamKilled(u32),
     RecordStreamKilled(u32),
-    Started(u32),
+    PlaybackStreamSuspended(StreamSuspendedParams),
+    RecordStreamSuspended(StreamSuspendedParams),
+    PlaybackStreamMoved(PlaybackStreamMovedParams),
+    RecordStreamMoved(RecordStreamMovedParams),
     PlaybackBufferAttrChanged(PlaybackBufferAttrChanged),
+    RecordBufferAttrChanged(RecordBufferAttrChanged),
+    ClientEvent(ClientEvent),
+    PlaybackStreamEvent(GenericStreamEvent),
+    RecordStreamEvent(GenericStreamEvent),
     SubscribeEvent(SubscriptionEvent),
 }
 
@@ -263,8 +343,8 @@ impl Command {
             CommandTag::CreateUploadStream => Ok(Command::CreateUploadStream(ts.read()?)),
             CommandTag::DeleteUploadStream => Ok(Command::DeleteUploadStream(ts.read_u32()?)),
             CommandTag::FinishUploadStream => Ok(Command::FinishUploadStream(ts.read_u32()?)),
-            CommandTag::PlaySample => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::RemoveSample => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::PlaySample => Ok(Command::PlaySample(ts.read()?)),
+            CommandTag::RemoveSample => Ok(Command::RemoveSample(ts.read_string_non_null()?)),
 
             CommandTag::GetServerInfo => Ok(Command::GetServerInfo),
             CommandTag::GetSinkInfo => Ok(Command::GetSinkInfo(ts.read()?)),
@@ -294,83 +374,79 @@ impl Command {
                 Ok(Command::PlaybackBufferAttrChanged(ts.read()?))
             }
 
-            CommandTag::SetSinkVolume => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::SetSinkInputVolume => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::SetSourceVolume => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::SetSinkMute => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::SetSourceMute => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetSinkVolume => Ok(Command::SetSinkVolume(ts.read()?)),
+            CommandTag::SetSinkInputVolume => Ok(Command::SetSinkInputVolume(ts.read()?)),
+            CommandTag::SetSourceVolume => Ok(Command::SetSourceVolume(ts.read()?)),
+            CommandTag::SetSinkMute => Ok(Command::SetSinkMute(ts.read()?)),
+            CommandTag::SetSourceMute => Ok(Command::SetSourceMute(ts.read()?)),
             CommandTag::CorkPlaybackStream => Ok(Command::CorkPlaybackStream(ts.read()?)),
             CommandTag::FlushPlaybackStream => Ok(Command::FlushPlaybackStream(ts.read_u32()?)),
             CommandTag::TriggerPlaybackStream => Ok(Command::TriggerPlaybackStream(ts.read_u32()?)),
-            CommandTag::SetDefaultSink => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::SetDefaultSource => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::SetPlaybackStreamName => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::SetRecordStreamName => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::KillClient => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::KillSinkInput => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::KillSourceOutput => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::LoadModule => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::UnloadModule => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::AddAutoloadObsolete => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::RemoveAutoloadObsolete => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::GetAutoloadInfoObsolete => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::GetAutoloadInfoListObsolete => {
-                Err(ProtocolError::Unimplemented(seq, command))
+            CommandTag::SetDefaultSink => Ok(Command::SetDefaultSink(ts.read_string_non_null()?)),
+            CommandTag::SetDefaultSource => {
+                Ok(Command::SetDefaultSource(ts.read_string_non_null()?))
             }
-            CommandTag::GetRecordLatency => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetPlaybackStreamName => Ok(Command::SetPlaybackStreamName(ts.read()?)),
+            CommandTag::SetRecordStreamName => Ok(Command::SetRecordStreamName(ts.read()?)),
+            CommandTag::KillClient => Ok(Command::KillClient(ts.read_u32()?)),
+            CommandTag::KillSinkInput => Ok(Command::KillSinkInput(ts.read_u32()?)),
+            CommandTag::KillSourceOutput => Ok(Command::KillSourceOutput(ts.read_u32()?)),
+            CommandTag::LoadModule => Ok(Command::LoadModule(ts.read()?)),
+            CommandTag::UnloadModule => Ok(Command::UnloadModule(ts.read_u32()?)),
+            CommandTag::GetRecordLatency => Ok(Command::GetRecordLatency(ts.read()?)),
             CommandTag::CorkRecordStream => Ok(Command::CorkRecordStream(ts.read()?)),
             CommandTag::FlushRecordStream => Ok(Command::FlushRecordStream(ts.read_u32()?)),
-            CommandTag::PrebufPlaybackStream => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::MoveSinkInput => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::MoveSourceOutput => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::SetSinkInputMute => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::SuspendSink => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::SuspendSource => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::PrebufPlaybackStream => Ok(Command::PrebufPlaybackStream(ts.read_u32()?)),
+            CommandTag::MoveSinkInput => Ok(Command::MoveSinkInput(ts.read()?)),
+            CommandTag::MoveSourceOutput => Ok(Command::MoveSourceOutput(ts.read()?)),
+            CommandTag::SetSinkInputMute => Ok(Command::SetSinkInputMute(ts.read()?)),
+            CommandTag::SuspendSink => Ok(Command::SuspendSink(ts.read()?)),
+            CommandTag::SuspendSource => Ok(Command::SuspendSource(ts.read()?)),
             CommandTag::SetPlaybackStreamBufferAttr => {
-                Err(ProtocolError::Unimplemented(seq, command))
+                Ok(Command::SetPlaybackStreamBufferAttr(ts.read()?))
             }
             CommandTag::SetRecordStreamBufferAttr => {
-                Err(ProtocolError::Unimplemented(seq, command))
+                Ok(Command::SetRecordStreamBufferAttr(ts.read()?))
             }
             CommandTag::UpdatePlaybackStreamSampleRate => {
-                Err(ProtocolError::Unimplemented(seq, command))
+                Ok(Command::UpdatePlaybackStreamSampleRate(ts.read()?))
             }
             CommandTag::UpdateRecordStreamSampleRate => {
-                Err(ProtocolError::Unimplemented(seq, command))
+                Ok(Command::UpdateRecordStreamSampleRate(ts.read()?))
             }
-            CommandTag::PlaybackStreamSuspended => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::RecordStreamSuspended => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::PlaybackStreamMoved => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::RecordStreamMoved => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::PlaybackStreamSuspended => Ok(Command::PlaybackStreamSuspended(ts.read()?)),
+            CommandTag::RecordStreamSuspended => Ok(Command::RecordStreamSuspended(ts.read()?)),
+            CommandTag::PlaybackStreamMoved => Ok(Command::PlaybackStreamMoved(ts.read()?)),
+            CommandTag::RecordStreamMoved => Ok(Command::RecordStreamMoved(ts.read()?)),
             CommandTag::UpdateRecordStreamProplist => {
                 Ok(Command::UpdateRecordStreamProplist(ts.read()?))
             }
             CommandTag::UpdatePlaybackStreamProplist => {
                 Ok(Command::UpdatePlaybackStreamProplist(ts.read()?))
             }
-            CommandTag::UpdateClientProplist => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::UpdateClientProplist => Ok(Command::UpdateClientProplist(ts.read()?)),
             CommandTag::RemoveRecordStreamProplist => {
-                Err(ProtocolError::Unimplemented(seq, command))
+                Ok(Command::RemoveRecordStreamProplist(ts.read_u32()?))
             }
             CommandTag::RemovePlaybackStreamProplist => {
-                Err(ProtocolError::Unimplemented(seq, command))
+                Ok(Command::RemovePlaybackStreamProplist(ts.read_u32()?))
             }
-            CommandTag::RemoveClientProplist => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::Extension => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::GetCardInfo => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::GetCardInfoList => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::SetCardProfile => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::ClientEvent => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::PlaybackStreamEvent => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::RecordStreamEvent => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::RemoveClientProplist => Ok(Command::RemoveClientProplist),
+            CommandTag::Extension => Ok(Command::Extension(ts.read()?)),
+            CommandTag::GetCardInfo => Ok(Command::GetCardInfo(ts.read_u32()?)),
+            CommandTag::GetCardInfoList => Ok(Command::GetCardInfoList),
+            CommandTag::SetCardProfile => Ok(Command::SetCardProfile(ts.read()?)),
+            CommandTag::ClientEvent => Ok(Command::ClientEvent(ts.read()?)),
+            CommandTag::PlaybackStreamEvent => Ok(Command::PlaybackStreamEvent(ts.read()?)),
+            CommandTag::RecordStreamEvent => Ok(Command::RecordStreamEvent(ts.read()?)),
 
-            CommandTag::RecordBufferAttrChanged => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::RecordBufferAttrChanged => Ok(Command::RecordBufferAttrChanged(ts.read()?)),
 
-            CommandTag::SetSinkPort => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::SetSourcePort => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::SetSourceOutputVolume => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::SetSourceOutputMute => Err(ProtocolError::Unimplemented(seq, command)),
-            CommandTag::SetPortLatencyOffset => Err(ProtocolError::Unimplemented(seq, command)),
+            CommandTag::SetSinkPort => Ok(Command::SetSinkPort(ts.read()?)),
+            CommandTag::SetSourcePort => Ok(Command::SetSourcePort(ts.read()?)),
+            CommandTag::SetSourceOutputVolume => Ok(Command::SetSourceOutputVolume(ts.read()?)),
+            CommandTag::SetSourceOutputMute => Ok(Command::SetSourceOutputMute(ts.read()?)),
+            CommandTag::SetPortLatencyOffset => Ok(Command::SetPortLatencyOffset(ts.read()?)),
             CommandTag::EnableSrbchannel => Err(ProtocolError::Unimplemented(seq, command)),
             CommandTag::DisableSrbchannel => Err(ProtocolError::Unimplemented(seq, command)),
             CommandTag::RegisterMemfdShmid => Err(ProtocolError::Unimplemented(seq, command)),
@@ -399,61 +475,114 @@ impl Command {
     /// The matching tag for this command.
     pub fn tag(&self) -> CommandTag {
         match self {
+            /* Generic commands */
             Command::Error(_) => CommandTag::Error,
-            Command::Timeout => CommandTag::Timeout,
+            Command::Timeout => CommandTag::Timeout, /* pseudo command */
+            Command::Reply => CommandTag::Reply,     /* actually used for command replies */
+            Command::CreatePlaybackStream(_) => CommandTag::CreatePlaybackStream, /* Payload changed in v9, v12 (0.9.0, 0.9.8) */
+            Command::DeletePlaybackStream(_) => CommandTag::DeletePlaybackStream,
+            Command::CreateRecordStream(_) => CommandTag::CreateRecordStream, /* Payload changed in v9, v12 (0.9.0, 0.9.8) */
+            Command::DeleteRecordStream(_) => CommandTag::DeleteRecordStream,
             Command::Exit => CommandTag::Exit,
-            Command::Reply => CommandTag::Reply,
-
             Command::Auth(_) => CommandTag::Auth,
             Command::SetClientName(_) => CommandTag::SetClientName,
-            Command::CreatePlaybackStream(_) => CommandTag::CreatePlaybackStream,
-            Command::DeletePlaybackStream(_) => CommandTag::DeletePlaybackStream,
-            Command::CreateRecordStream(_) => CommandTag::CreateRecordStream,
-            Command::DeleteRecordStream(_) => CommandTag::DeleteRecordStream,
+            Command::LookupSink(_) => CommandTag::LookupSink,
+            Command::LookupSource(_) => CommandTag::LookupSource,
             Command::DrainPlaybackStream(_) => CommandTag::DrainPlaybackStream,
+            Command::Stat => CommandTag::Stat,
             Command::GetPlaybackLatency(_) => CommandTag::GetPlaybackLatency,
-            Command::GetRecordLatency(_) => CommandTag::GetRecordLatency,
             Command::CreateUploadStream(_) => CommandTag::CreateUploadStream,
             Command::DeleteUploadStream(_) => CommandTag::DeleteUploadStream,
             Command::FinishUploadStream(_) => CommandTag::FinishUploadStream,
-            Command::UpdatePlaybackStreamProplist(_) => CommandTag::UpdatePlaybackStreamProplist,
-            Command::UpdateRecordStreamProplist(_) => CommandTag::UpdateRecordStreamProplist,
-            Command::CorkPlaybackStream(_) => CommandTag::CorkPlaybackStream,
-            Command::CorkRecordStream(_) => CommandTag::CorkRecordStream,
-            Command::FlushPlaybackStream(_) => CommandTag::FlushPlaybackStream,
-            Command::FlushRecordStream(_) => CommandTag::FlushRecordStream,
-            Command::PrebufPlaybackStream(_) => CommandTag::PrebufPlaybackStream,
-            Command::TriggerPlaybackStream(_) => CommandTag::TriggerPlaybackStream,
-
-            Command::Stat => CommandTag::Stat,
+            Command::PlaySample(_) => CommandTag::PlaySample,
+            Command::RemoveSample(_) => CommandTag::RemoveSample,
             Command::GetServerInfo => CommandTag::GetServerInfo,
             Command::GetSinkInfo(_) => CommandTag::GetSinkInfo,
             Command::GetSinkInfoList => CommandTag::GetSinkInfoList,
             Command::GetSourceInfo(_) => CommandTag::GetSourceInfo,
             Command::GetSourceInfoList => CommandTag::GetSourceInfoList,
-            Command::GetClientInfo(_) => CommandTag::GetClientInfo,
-            Command::GetClientInfoList => CommandTag::GetClientInfoList,
-            // Command::GetCardInfoList => CommandTag::GetCardInfoList,
             Command::GetModuleInfo(_) => CommandTag::GetModuleInfo,
             Command::GetModuleInfoList => CommandTag::GetModuleInfoList,
-            Command::GetSinkInputInfo(_) => CommandTag::GetSinkInputInfo,
-            Command::GetSinkInputInfoList => CommandTag::GetSinkInputInfoList,
+            Command::GetClientInfo(_) => CommandTag::GetClientInfo,
+            Command::GetClientInfoList => CommandTag::GetClientInfoList,
+            Command::GetSinkInputInfo(_) => CommandTag::GetSinkInputInfo, /* Payload changed in v11 (0.9.7) */
+            Command::GetSinkInputInfoList => CommandTag::GetSinkInputInfoList, /* Payload changed in v11 (0.9.7) */
             Command::GetSourceOutputInfo(_) => CommandTag::GetSourceOutputInfo,
             Command::GetSourceOutputInfoList => CommandTag::GetSourceOutputInfoList,
             Command::GetSampleInfo(_) => CommandTag::GetSampleInfo,
             Command::GetSampleInfoList => CommandTag::GetSampleInfoList,
             Command::Subscribe(_) => CommandTag::Subscribe,
-            Command::SubscribeEvent(_) => CommandTag::SubscribeEvent,
-            Command::LookupSink(_) => CommandTag::LookupSink,
-            Command::LookupSource(_) => CommandTag::LookupSource,
-
+            Command::SetSinkVolume(_) => CommandTag::SetSinkVolume,
+            Command::SetSinkInputVolume(_) => CommandTag::SetSinkInputVolume,
+            Command::SetSourceVolume(_) => CommandTag::SetSourceVolume,
+            Command::SetSinkMute(_) => CommandTag::SetSinkMute,
+            Command::SetSourceMute(_) => CommandTag::SetSourceMute,
+            Command::CorkPlaybackStream(_) => CommandTag::CorkPlaybackStream,
+            Command::FlushPlaybackStream(_) => CommandTag::FlushPlaybackStream,
+            Command::TriggerPlaybackStream(_) => CommandTag::TriggerPlaybackStream,
+            Command::SetDefaultSink(_) => CommandTag::SetDefaultSink,
+            Command::SetDefaultSource(_) => CommandTag::SetDefaultSource,
+            Command::SetPlaybackStreamName(_) => CommandTag::SetPlaybackStreamName,
+            Command::SetRecordStreamName(_) => CommandTag::SetRecordStreamName,
+            Command::KillClient(_) => CommandTag::KillClient,
+            Command::KillSinkInput(_) => CommandTag::KillSinkInput,
+            Command::KillSourceOutput(_) => CommandTag::KillSourceOutput,
+            Command::LoadModule(_) => CommandTag::LoadModule,
+            Command::UnloadModule(_) => CommandTag::UnloadModule,
+            // Command::AddAutoloadObsolete(_) => CommandTag::AddAutoloadObsolete,
+            // Command::RemoveAutoloadObsolete(_) => CommandTag::RemoveAutoloadObsolete,
+            // Command::GetAutoloadInfoObsolete(_) => CommandTag::GetAutoloadInfoObsolete,
+            // Command::GetAutoloadInfoListObsolete(_) => CommandTag::GetAutoloadInfoListObsolete,
+            Command::GetRecordLatency(_) => CommandTag::GetRecordLatency,
+            Command::CorkRecordStream(_) => CommandTag::CorkRecordStream,
+            Command::FlushRecordStream(_) => CommandTag::FlushRecordStream,
+            Command::PrebufPlaybackStream(_) => CommandTag::PrebufPlaybackStream,
             Command::Request(_) => CommandTag::Request,
             Command::Overflow(_) => CommandTag::Overflow,
             Command::Underflow(_) => CommandTag::Underflow,
             Command::PlaybackStreamKilled(_) => CommandTag::PlaybackStreamKilled,
             Command::RecordStreamKilled(_) => CommandTag::RecordStreamKilled,
+            Command::SubscribeEvent(_) => CommandTag::SubscribeEvent,
+            Command::MoveSinkInput(_) => CommandTag::MoveSinkInput,
+            Command::MoveSourceOutput(_) => CommandTag::MoveSourceOutput,
+            Command::SetSinkInputMute(_) => CommandTag::SetSinkInputMute,
+            Command::SuspendSink(_) => CommandTag::SuspendSink,
+            Command::SuspendSource(_) => CommandTag::SuspendSource,
+            Command::SetPlaybackStreamBufferAttr(_) => CommandTag::SetPlaybackStreamBufferAttr,
+            Command::SetRecordStreamBufferAttr(_) => CommandTag::SetRecordStreamBufferAttr,
+            Command::UpdatePlaybackStreamSampleRate(_) => {
+                CommandTag::UpdatePlaybackStreamSampleRate
+            }
+            Command::UpdateRecordStreamSampleRate(_) => CommandTag::UpdateRecordStreamSampleRate,
+            Command::PlaybackStreamSuspended(_) => CommandTag::PlaybackStreamSuspended,
+            Command::RecordStreamSuspended(_) => CommandTag::RecordStreamSuspended,
+            Command::PlaybackStreamMoved(_) => CommandTag::PlaybackStreamMoved,
+            Command::RecordStreamMoved(_) => CommandTag::RecordStreamMoved,
+            Command::UpdateRecordStreamProplist(_) => CommandTag::UpdateRecordStreamProplist,
+            Command::UpdatePlaybackStreamProplist(_) => CommandTag::UpdatePlaybackStreamProplist,
+            Command::UpdateClientProplist(_) => CommandTag::UpdateClientProplist,
+            Command::RemoveRecordStreamProplist(_) => CommandTag::RemoveRecordStreamProplist,
+            Command::RemovePlaybackStreamProplist(_) => CommandTag::RemovePlaybackStreamProplist,
+            Command::RemoveClientProplist => CommandTag::RemoveClientProplist,
             Command::Started(_) => CommandTag::Started,
+            Command::Extension(_) => CommandTag::Extension,
+            Command::GetCardInfo(_) => CommandTag::GetCardInfo,
+            Command::GetCardInfoList => CommandTag::GetCardInfoList,
+            Command::SetCardProfile(_) => CommandTag::SetCardProfile,
+            Command::ClientEvent(_) => CommandTag::ClientEvent,
+            Command::PlaybackStreamEvent(_) => CommandTag::PlaybackStreamEvent,
+            Command::RecordStreamEvent(_) => CommandTag::RecordStreamEvent,
             Command::PlaybackBufferAttrChanged(_) => CommandTag::PlaybackBufferAttrChanged,
+            Command::RecordBufferAttrChanged(_) => CommandTag::RecordBufferAttrChanged,
+            Command::SetSinkPort(_) => CommandTag::SetSinkPort,
+            Command::SetSourcePort(_) => CommandTag::SetSourcePort,
+            Command::SetSourceOutputVolume(_) => CommandTag::SetSourceOutputVolume,
+            Command::SetSourceOutputMute(_) => CommandTag::SetSourceOutputMute,
+            Command::SetPortLatencyOffset(_) => CommandTag::SetPortLatencyOffset,
+            // Command::EnableSrbchannel(_) => CommandTag::EnableSrbchannel,
+            // Command::DisableSrbchannel(_) => CommandTag::DisableSrbchannel,
+            // Command::RegisterMemfdShmid(_) => CommandTag::RegisterMemfdShmid,
+            // Command::SendObjectMessage(_) => CommandTag::SendObjectMessage,
         }
     }
 }
@@ -469,33 +598,41 @@ impl TagStructWrite for Command {
             Command::Timeout => Ok(()),
             Command::Reply => Ok(()),
             Command::Exit => Ok(()),
-
-            Command::Auth(ref p) => w.write(p),
-            Command::SetClientName(ref p) => w.write(p),
-            Command::CreatePlaybackStream(ref p) => w.write(p),
-            Command::DeletePlaybackStream(chan) => w.write_u32(*chan),
-            Command::CreateRecordStream(ref p) => w.write(p),
-            Command::DeleteRecordStream(chan) => w.write_u32(*chan),
-            Command::DrainPlaybackStream(chan) => w.write_u32(*chan),
-            Command::GetPlaybackLatency(ref p) => w.write(p),
-            Command::GetRecordLatency(ref p) => w.write(p),
-            Command::CreateUploadStream(ref p) => w.write(p),
-            Command::DeleteUploadStream(chan) => w.write_u32(*chan),
-            Command::FinishUploadStream(chan) => w.write_u32(*chan),
-            Command::UpdatePlaybackStreamProplist(ref p) => w.write(p),
-            Command::UpdateRecordStreamProplist(ref p) => w.write(p),
-            Command::CorkPlaybackStream(ref p) => w.write(p),
-            Command::CorkRecordStream(ref p) => w.write(p),
-            Command::FlushPlaybackStream(chan) => w.write_u32(*chan),
-            Command::FlushRecordStream(chan) => w.write_u32(*chan),
-            Command::PrebufPlaybackStream(chan) => w.write_u32(*chan),
-            Command::TriggerPlaybackStream(chan) => w.write_u32(*chan),
-
+            Command::Auth(p) => w.write(p),
+            Command::SetClientName(p) => w.write(p),
+            Command::CreatePlaybackStream(p) => w.write(p),
+            Command::DeletePlaybackStream(id) => w.write_u32(*id),
+            Command::CreateRecordStream(p) => w.write(p),
+            Command::DeleteRecordStream(id) => w.write_u32(*id),
+            Command::DrainPlaybackStream(id) => w.write_u32(*id),
+            Command::GetPlaybackLatency(p) => w.write(p),
+            Command::GetRecordLatency(p) => w.write(p),
+            Command::CreateUploadStream(p) => w.write(p),
+            Command::DeleteUploadStream(id) => w.write_u32(*id),
+            Command::FinishUploadStream(id) => w.write_u32(*id),
+            Command::CorkPlaybackStream(p) => w.write(p),
+            Command::CorkRecordStream(p) => w.write(p),
+            Command::FlushPlaybackStream(id) => w.write_u32(*id),
+            Command::FlushRecordStream(id) => w.write_u32(*id),
+            Command::PrebufPlaybackStream(id) => w.write_u32(*id),
+            Command::TriggerPlaybackStream(id) => w.write_u32(*id),
+            Command::SetPlaybackStreamName(p) => w.write(p),
+            Command::SetRecordStreamName(p) => w.write(p),
+            Command::SetPlaybackStreamBufferAttr(p) => w.write(p),
+            Command::SetRecordStreamBufferAttr(p) => w.write(p),
+            Command::UpdatePlaybackStreamProplist(p) => w.write(p),
+            Command::UpdateRecordStreamProplist(p) => w.write(p),
+            Command::RemovePlaybackStreamProplist(id) => w.write_u32(*id),
+            Command::RemoveRecordStreamProplist(id) => w.write_u32(*id),
+            Command::UpdatePlaybackStreamSampleRate(p) => w.write(p),
+            Command::UpdateRecordStreamSampleRate(p) => w.write(p),
             Command::Stat => Ok(()),
             Command::GetServerInfo => Ok(()),
-            Command::GetSinkInfo(ref p) => w.write(p),
+            Command::GetCardInfo(id) => w.write_u32(*id),
+            Command::GetCardInfoList => Ok(()),
+            Command::GetSinkInfo(p) => w.write(p),
             Command::GetSinkInfoList => Ok(()),
-            Command::GetSourceInfo(ref p) => w.write(p),
+            Command::GetSourceInfo(id) => w.write(id),
             Command::GetSourceInfoList => Ok(()),
             Command::GetModuleInfo(id) => w.write_u32(*id),
             Command::GetModuleInfoList => Ok(()),
@@ -505,20 +642,55 @@ impl TagStructWrite for Command {
             Command::GetSinkInputInfoList => Ok(()),
             Command::GetSourceOutputInfo(id) => w.write_u32(*id),
             Command::GetSourceOutputInfoList => Ok(()),
-            Command::GetSampleInfo(id) => w.write_u32(*id),
+            Command::GetSampleInfo(p) => w.write_u32(*p),
             Command::GetSampleInfoList => Ok(()),
-            Command::Subscribe(mask) => w.write(mask),
-            Command::SubscribeEvent(ref p) => w.write(p),
-            Command::LookupSink(ref p) => w.write_string(Some(p)),
-            Command::LookupSource(ref p) => w.write_string(Some(p)),
-
-            Command::Request(ref p) => w.write(p),
-            Command::Overflow(chan) => w.write_u32(*chan),
-            Command::Underflow(ref p) => w.write(p),
-            Command::PlaybackStreamKilled(chan) => w.write_u32(*chan),
-            Command::RecordStreamKilled(chan) => w.write_u32(*chan),
-            Command::Started(chan) => w.write_u32(*chan),
-            Command::PlaybackBufferAttrChanged(ref p) => w.write(p),
+            Command::LookupSink(p) => w.write_string(Some(p)),
+            Command::LookupSource(p) => w.write_string(Some(p)),
+            Command::Subscribe(p) => w.write(p),
+            Command::SetDefaultSink(p) => w.write_string(Some(p)),
+            Command::SetDefaultSource(p) => w.write_string(Some(p)),
+            Command::SetSinkPort(p) => w.write(p),
+            Command::SetSourcePort(p) => w.write(p),
+            Command::SetCardProfile(p) => w.write(p),
+            Command::KillClient(id) => w.write_u32(*id),
+            Command::KillSinkInput(id) => w.write_u32(*id),
+            Command::KillSourceOutput(id) => w.write_u32(*id),
+            Command::MoveSinkInput(p) => w.write(p),
+            Command::MoveSourceOutput(p) => w.write(p),
+            Command::SuspendSink(p) => w.write(p),
+            Command::SuspendSource(p) => w.write(p),
+            Command::UpdateClientProplist(p) => w.write(p),
+            Command::RemoveClientProplist => Ok(()),
+            Command::SetPortLatencyOffset(p) => w.write(p),
+            Command::PlaySample(p) => w.write(p),
+            Command::RemoveSample(p) => w.write_string(Some(p)),
+            Command::LoadModule(p) => w.write(p),
+            Command::UnloadModule(id) => w.write_u32(*id),
+            Command::Extension(p) => w.write(p),
+            Command::SetSinkVolume(p) => w.write(p),
+            Command::SetSinkInputVolume(p) => w.write(p),
+            Command::SetSourceVolume(p) => w.write(p),
+            Command::SetSourceOutputVolume(p) => w.write(p),
+            Command::SetSinkMute(p) => w.write(p),
+            Command::SetSinkInputMute(p) => w.write(p),
+            Command::SetSourceMute(p) => w.write(p),
+            Command::SetSourceOutputMute(p) => w.write(p),
+            Command::Started(id) => w.write_u32(*id),
+            Command::Request(p) => w.write(p),
+            Command::Overflow(id) => w.write_u32(*id),
+            Command::Underflow(p) => w.write(p),
+            Command::PlaybackStreamKilled(id) => w.write_u32(*id),
+            Command::RecordStreamKilled(id) => w.write_u32(*id),
+            Command::PlaybackStreamSuspended(p) => w.write(p),
+            Command::RecordStreamSuspended(p) => w.write(p),
+            Command::PlaybackStreamMoved(p) => w.write(p),
+            Command::RecordStreamMoved(p) => w.write(p),
+            Command::PlaybackBufferAttrChanged(p) => w.write(p),
+            Command::RecordBufferAttrChanged(p) => w.write(p),
+            Command::ClientEvent(p) => w.write(p),
+            Command::PlaybackStreamEvent(p) => w.write(p),
+            Command::RecordStreamEvent(p) => w.write(p),
+            Command::SubscribeEvent(p) => w.write(p),
         }
     }
 }

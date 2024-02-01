@@ -5,12 +5,13 @@ use std::ffi::CString;
 use enum_primitive_derive::Primitive;
 
 /// Specifies the direction of a port.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Primitive)]
+#[repr(u8)]
 pub enum PortDirection {
     /// The port is an input, ie. part of a source.
-    Input,
+    Input = 1,
     /// The port is an output, ie. part of a sink.
-    Output,
+    Output = 2,
 }
 
 /// Port availability status.

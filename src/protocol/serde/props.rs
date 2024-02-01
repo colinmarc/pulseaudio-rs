@@ -494,9 +494,9 @@ impl TagStructWrite for Props {
     }
 }
 
-/// The mode of an update operation.
+/// The mode of a [`Props`] update operation, used in various commands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Primitive)]
-pub enum UpdateMode {
+pub enum PropsUpdateMode {
     /// Replace the entire property list with the new one.
     Set = 0,
 
@@ -505,43 +505,6 @@ pub enum UpdateMode {
 
     /// Merge the new property list with the current one, overwriting any values.
     Replace = 2,
-}
-
-/// An update operation for a property list.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdatePropsParams {
-    /// The index of the object to update.
-    pub index: u32,
-
-    /// The type of update being performed.
-    pub mode: UpdateMode,
-
-    /// The new props.
-    pub props: Props,
-}
-
-impl TagStructRead for UpdatePropsParams {
-    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
-        let index = ts.read_u32()?;
-        let mode = ts.read_enum()?;
-        let props = ts.read()?;
-
-        Ok(Self { index, mode, props })
-    }
-}
-
-impl TagStructWrite for UpdatePropsParams {
-    fn write(
-        &self,
-        w: &mut TagStructWriter<'_>,
-        _protocol_version: u16,
-    ) -> Result<(), ProtocolError> {
-        w.write_u32(self.index)?;
-        w.write_u32(self.mode as u32)?;
-        w.write(&self.props)?;
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -557,22 +520,6 @@ mod tests {
         props.set(Prop::ApplicationName, CString::new("bar").unwrap());
 
         test_serde_version(&props, MAX_VERSION)?;
-        Ok(())
-    }
-
-    #[test]
-    fn update_props_params_serde() -> anyhow::Result<()> {
-        let mut props = Props::new();
-        props.set_bytes(CString::new("foo")?, [1, 2, 3]);
-        props.set(Prop::ApplicationName, CString::new("bar").unwrap());
-
-        let params = UpdatePropsParams {
-            index: 42,
-            mode: UpdateMode::Set,
-            props,
-        };
-
-        test_serde_version(&params, MAX_VERSION)?;
         Ok(())
     }
 }

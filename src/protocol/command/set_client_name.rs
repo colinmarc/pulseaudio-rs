@@ -28,3 +28,16 @@ impl TagStructWrite for SetClientNameReply {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::test_util::test_serde;
+
+    #[test]
+    fn test_set_client_name_reply_serde() -> anyhow::Result<()> {
+        let reply = SetClientNameReply { client_id: 0 };
+
+        test_serde(&reply)
+    }
+}
