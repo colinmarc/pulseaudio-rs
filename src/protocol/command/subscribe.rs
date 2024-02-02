@@ -81,8 +81,8 @@ pub enum SubscriptionEventFacility {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum SubscriptionEventType {
     New = 0x00,
-    Changed = 0x20,
-    Removed = 0x30,
+    Changed = 0x10,
+    Removed = 0x20,
 }
 
 const FACILITY_MASK: u32 = 0x0F;
@@ -104,10 +104,16 @@ impl TagStructRead for SubscriptionEvent {
         use num_traits::FromPrimitive as _;
 
         let raw = ts.read_u32()?;
-        let event_facility = SubscriptionEventFacility::from_u32(raw & FACILITY_MASK)
-            .ok_or_else(|| ProtocolError::Invalid(format!("invalid event facility: {}", raw)))?;
-        let event_type = SubscriptionEventType::from_u32(raw & EVENT_TYPE_MASK)
-            .ok_or_else(|| ProtocolError::Invalid(format!("invalid event type: {}", raw)))?;
+        let event_facility = raw & FACILITY_MASK;
+        let event_type = raw & EVENT_TYPE_MASK;
+
+        let event_facility =
+            SubscriptionEventFacility::from_u32(event_facility).ok_or_else(|| {
+                ProtocolError::Invalid(format!("invalid event facility: {:#b}", event_facility))
+            })?;
+        let event_type = SubscriptionEventType::from_u32(event_type).ok_or_else(|| {
+            ProtocolError::Invalid(format!("invalid event type: {:#b}", event_type))
+        })?;
         let index = ts.read_index()?;
 
         Ok(Self {
