@@ -353,6 +353,8 @@ fn read_reply(
         pulse::CommandTag::Stat => Box::new(ts.read::<pulse::StatInfo>()?),
         pulse::CommandTag::GetPlaybackLatency => Box::new(ts.read::<pulse::PlaybackLatency>()?),
         pulse::CommandTag::GetServerInfo => Box::new(ts.read::<pulse::ServerInfo>()?),
+        pulse::CommandTag::GetCardInfo => Box::new(ts.read::<pulse::CardInfo>()?),
+        pulse::CommandTag::GetCardInfoList => Box::new(ts.read::<pulse::CardInfoList>()?),
         pulse::CommandTag::GetSinkInfo => Box::new(ts.read::<pulse::SinkInfo>()?),
         pulse::CommandTag::GetSinkInfoList => Box::new(ts.read::<pulse::SinkInfoList>()?),
         pulse::CommandTag::GetSourceInfo => Box::new(ts.read::<pulse::SourceInfo>()?),
@@ -367,6 +369,12 @@ fn read_reply(
         pulse::CommandTag::GetSourceOutputInfoList => Box::new(ts.read::<SourceOutputInfoList>()?),
         pulse::CommandTag::GetSampleInfo => Box::new(ts.read::<pulse::SampleInfo>()?),
         pulse::CommandTag::GetSampleInfoList => Box::new(ts.read::<pulse::SampleInfoList>()?),
+        pulse::CommandTag::SetPlaybackStreamBufferAttr => {
+            Box::new(ts.read::<pulse::SetPlaybackStreamBufferAttrReply>()?)
+        }
+        pulse::CommandTag::SetRecordStreamBufferAttr => {
+            Box::new(ts.read::<pulse::SetRecordStreamBufferAttrReply>()?)
+        }
         pulse::CommandTag::Subscribe => Box::new(Ack),
         _ if reply_len == 0 => Box::new(Ack),
         _ => Box::new(UnknownReply(reply_len)),
