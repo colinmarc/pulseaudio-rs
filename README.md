@@ -17,6 +17,6 @@ Not yet implemented (but contributions welcome!)
 
  - [Listing sinks](examples/list-sinks.rs)
  - [Subscribing to server events](examples/subscribe.rs)
- - [Playing an audio file](examples/playback.rs))
+ - [Playing an audio file](examples/playback.rs)
  - [Recording audio](examples/record.rs)
  - [Acting as a sound server](examples/server.rs)
