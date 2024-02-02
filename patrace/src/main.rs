@@ -223,11 +223,13 @@ fn proxy(conn: &mut Connection, direction: Direction) -> anyhow::Result<()> {
                                     );
 
                                     let reply: pulse::AuthReply = ts.read()?;
-                                    conn.negotiated_version = reply.version;
+                                    conn.negotiated_version =
+                                        std::cmp::min(conn.negotiated_version, reply.version);
 
                                     Box::new(reply)
                                 }
-                                Some(tag) => read_reply(&mut cursor, tag, conn.negotiated_version)?,
+                                Some(tag) => read_reply(&mut cursor, tag, conn.negotiated_version)
+                                    .context(format!("reading reply to [{}] {:?}", seq, tag))?,
                                 None => Box::new(UnknownReply(msg_bytes.len())),
                             };
 
@@ -256,6 +258,8 @@ fn proxy(conn: &mut Connection, direction: Direction) -> anyhow::Result<()> {
                                     version,
                                 )?;
 
+                                conn.negotiated_version =
+                                    std::cmp::min(version, conn.negotiated_version);
                                 proxy = false;
                             } else if let pulse::Command::SetClientName(ref props) = cmd {
                                 if let Some(name) = props.get(pulse::Prop::ApplicationName) {
