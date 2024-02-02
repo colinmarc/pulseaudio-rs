@@ -6,12 +6,17 @@ This is a native rust implementation of the [PulseAudio](https://www.freedesktop
 
 Currently implemented:
 
- - Types for server introspection ([example](examples/list-sinks.rs)), for listing sinks, sources, clients, etc.
- - Types for basic playback ([example](examples/playback.rs)) and record streams
+ - Low-level serialization and deserialization of the wire format (called "tagstructs")
 
 Not yet implemented (but contributions welcome!)
 
  - A higher level `async`-friendly API
  - `memfd`/`shm` shenanigans for zero-copy streaming
- - Most other functionality
- 
+
+ Examples:
+
+ - [Listing sinks](examples/list-sinks.rs)
+ - [Subscribing to server events](examples/subscribe.rs)
+ - [Playing an audio file](examples/playback.rs))
+ - [Recording audio](examples/record.rs)
+ - [Acting as a sound server](examples/server.rs)
