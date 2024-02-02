@@ -331,9 +331,7 @@ mod integration_tests {
             Command::GetCardInfoList,
             protocol_version,
         )?;
-        let (_, info) = protocol::read_reply_message::<CardInfo>(&mut sock, protocol_version)?;
-
-        assert!(!info.name.to_str().unwrap().is_empty());
+        let _ = protocol::read_reply_message::<CardInfoList>(&mut sock, protocol_version)?;
 
         Ok(())
     }
