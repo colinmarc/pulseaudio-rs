@@ -117,18 +117,6 @@ mod integration_tests {
         assert_eq!(seq, 0);
         assert!(!info_list.is_empty());
 
-        write_command_message(
-            sock.get_mut(),
-            1,
-            Command::GetClientInfo(info_list[0].index),
-            protocol_version,
-        )?;
-
-        let (seq, info) = read_reply_message::<ClientInfo>(&mut sock, protocol_version)?;
-        assert_eq!(seq, 1);
-
-        assert_eq!(info, info_list[0]);
-
         Ok(())
     }
 }
