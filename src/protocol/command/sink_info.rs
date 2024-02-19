@@ -147,7 +147,7 @@ impl SinkInfo {
                 name: CString::new("Stereo Output").unwrap(),
                 port_type: PortType::Unknown,
                 description: None,
-                dir: PortDirection::Output,
+                dir: PortDirection::Input,
                 priority: 0,
                 available: PortAvailable::Yes,
                 availability_group: None,

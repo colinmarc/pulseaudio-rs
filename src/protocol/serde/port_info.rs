@@ -8,9 +8,9 @@ use enum_primitive_derive::Primitive;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Primitive)]
 #[repr(u8)]
 pub enum PortDirection {
-    /// The port is an input, ie. part of a source.
+    /// The port is an input, ie. part of a sink.
     Input = 1,
-    /// The port is an output, ie. part of a sink.
+    /// The port is an output, ie. part of a source.
     Output = 2,
 }
 
