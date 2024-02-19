@@ -298,9 +298,8 @@ impl TagStructWrite for SinkInfo {
         w.write_index(self.monitor_source_index)?; // sink's monitor source
         w.write_string(self.monitor_source_name.as_ref())?;
         w.write_usec(self.actual_latency)?;
-        w.write_string(self.driver.as_ref())?; // TODO: driver name
+        w.write_string(self.driver.as_ref())?;
         w.write_u32(self.flags.bits())?;
-        // proto>=13
         w.write(&self.props)?;
         w.write_usec(self.configured_latency)?;
         if protocol_version >= 15 {
@@ -317,6 +316,11 @@ impl TagStructWrite for SinkInfo {
                 w.write_u32(port.priority)?;
                 if protocol_version >= 24 {
                     w.write_u32(port.available as u32)?;
+                }
+
+                if protocol_version >= 34 {
+                    w.write_string(port.availability_group.as_ref())?;
+                    w.write_u32(port.port_type as u32)?;
                 }
             }
 
