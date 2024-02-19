@@ -3,7 +3,7 @@ use std::{
     io::{Cursor, Read, Write},
 };
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 use bytes::BytesMut;
 use chrono::Utc;
 use clap::Parser;
@@ -154,7 +154,15 @@ fn main() -> anyhow::Result<()> {
                             Direction::ServerToClient
                         };
 
-                        proxy(conn, direction)?;
+                        match proxy(conn, direction) {
+                            Ok(()) => (),
+                            Err(e) => match e.downcast_ref::<std::io::Error>() {
+                                // I/O errors might happen if the one end
+                                // hangs up. We'll catch the close event.
+                                Some(_) => continue,
+                                _ => bail!(e),
+                            },
+                        }
                     }
                 }
             }
