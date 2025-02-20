@@ -435,6 +435,7 @@ mod tests {
     }
 }
 
+/// Internal test utilities.
 #[cfg(test)]
 pub mod test_util {
     use super::*;
@@ -444,6 +445,7 @@ pub mod test_util {
     use pretty_assertions::assert_eq;
     use std::io::Cursor;
 
+    /// Tests that each version of the protocol can roundtrip the given tagstruct.
     pub fn test_serde<T>(v: &T) -> anyhow::Result<()>
     where
         T: TagStructRead + TagStructWrite + PartialEq + std::fmt::Debug,
@@ -457,6 +459,7 @@ pub mod test_util {
         Ok(())
     }
 
+    /// Tests that a given version of the protocol can roundtrip the given tagstruct.
     pub fn test_serde_version<T>(v: &T, version: u16) -> anyhow::Result<()>
     where
         T: TagStructRead + TagStructWrite + std::fmt::Debug,

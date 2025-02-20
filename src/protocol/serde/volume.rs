@@ -1,7 +1,7 @@
 //! Defines volume specification data types.
 
+use std::fmt;
 use std::slice;
-use std::{fmt, u32};
 
 use byteorder::NetworkEndian;
 
