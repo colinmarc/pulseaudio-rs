@@ -90,7 +90,7 @@ impl fmt::Debug for Volume {
 
 impl TagStructRead for Volume {
     fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
-        ts.expect_tag(super::Tag::Volume)?;
+        ts.expect_tag(Tag::Volume)?;
         Ok(Volume::from_u32_clamped(
             ts.inner.read_u32::<NetworkEndian>()?,
         ))
@@ -190,7 +190,7 @@ impl<'a> Iterator for Iter<'a> {
 
 impl TagStructRead for ChannelVolume {
     fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
-        ts.expect_tag(super::Tag::CVolume)?;
+        ts.expect_tag(Tag::CVolume)?;
         let n_channels = ts.inner.read_u8()?;
         if n_channels == 0 || n_channels > CHANNELS_MAX {
             return Err(ProtocolError::Invalid(format!(

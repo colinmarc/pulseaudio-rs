@@ -94,7 +94,7 @@ mod tests {
             ..Default::default()
         };
 
-        crate::protocol::test_util::test_serde(&client_info)
+        test_util::test_serde(&client_info)
     }
 }
 

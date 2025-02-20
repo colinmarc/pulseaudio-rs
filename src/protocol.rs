@@ -163,15 +163,15 @@ pub fn read_reply_message<T: CommandReply>(
     let desc = read_descriptor(r)?;
 
     let mut r = r.take(desc.length as u64);
-    let mut ts = serde::TagStructReader::new(&mut r, protocol_version);
+    let mut ts = TagStructReader::new(&mut r, protocol_version);
     let (cmd, seq) = (ts.read_enum()?, ts.read_u32()?);
 
     match cmd {
-        command::CommandTag::Error => {
+        CommandTag::Error => {
             let error = ts.read_enum()?;
             Err(ProtocolError::ServerError(error))
         }
-        command::CommandTag::Reply => Ok((seq, T::read(&mut ts, protocol_version)?)),
+        CommandTag::Reply => Ok((seq, T::read(&mut ts, protocol_version)?)),
         _ => Err(ProtocolError::UnexpectedCommand(cmd)),
     }
 }
@@ -190,7 +190,7 @@ where
     cursor.seek(SeekFrom::Start(DESCRIPTOR_SIZE as u64))?;
 
     let mut ts = TagStructWriter::new(&mut cursor, protocol_version);
-    ts.write_u32(command::CommandTag::Reply as u32)?;
+    ts.write_u32(CommandTag::Reply as u32)?;
     ts.write_u32(seq)?;
     ts.write(reply)?;
 
@@ -222,7 +222,7 @@ pub fn write_reply_message<W: Write, R: CommandReply>(
     let mut buf = Cursor::new(Vec::new());
     let mut ts = TagStructWriter::new(&mut buf, protocol_version);
 
-    ts.write_u32(command::CommandTag::Reply as u32)?;
+    ts.write_u32(CommandTag::Reply as u32)?;
     ts.write_u32(seq)?;
     ts.write(reply)?;
 
@@ -251,15 +251,15 @@ pub fn read_ack_message(r: &mut impl BufRead) -> Result<u32, ProtocolError> {
     let mut r = r.take(desc.length as u64);
 
     // Protocol version doesn't matter for this.
-    let mut ts = serde::TagStructReader::new(&mut r, MAX_VERSION);
+    let mut ts = TagStructReader::new(&mut r, MAX_VERSION);
     let (cmd, seq) = (ts.read_enum()?, ts.read_u32()?);
 
     match cmd {
-        command::CommandTag::Error => {
+        CommandTag::Error => {
             let error = ts.read_enum()?;
             Err(ProtocolError::ServerError(error))
         }
-        command::CommandTag::Reply => Ok(seq),
+        CommandTag::Reply => Ok(seq),
         _ => Err(ProtocolError::Invalid(format!(
             "expected reply, got {:?}",
             cmd
@@ -278,7 +278,7 @@ where
 
     // Protocol version doesn't matter for this.
     let mut ts = TagStructWriter::new(&mut cursor, MAX_VERSION);
-    ts.write_u32(command::CommandTag::Reply as u32)?;
+    ts.write_u32(CommandTag::Reply as u32)?;
     ts.write_u32(seq)?;
 
     let length = (cursor.position() - DESCRIPTOR_SIZE as u64)
@@ -312,7 +312,7 @@ pub fn write_ack_message<W: Write>(w: &mut W, seq: u32) -> Result<(), ProtocolEr
     // Protocol version doesn't matter for this.
     let mut ts = TagStructWriter::new(w, MAX_VERSION);
 
-    ts.write_u32(command::CommandTag::Reply as u32)?;
+    ts.write_u32(CommandTag::Reply as u32)?;
     ts.write_u32(seq)?;
 
     Ok(())
@@ -332,7 +332,7 @@ pub fn write_error<W: Write>(w: &mut W, seq: u32, error: PulseError) -> Result<(
     // Protocol version doesn't matter for this.
     let mut ts = TagStructWriter::new(w, MAX_VERSION);
 
-    ts.write_u32(command::CommandTag::Error as u32)?;
+    ts.write_u32(CommandTag::Error as u32)?;
     ts.write_u32(seq)?;
     ts.write_u32(error as u32)?;
 

@@ -337,98 +337,98 @@ impl Prop {
         use self::Prop::*;
 
         match *self {
-            MediaName => CStr::from_bytes_with_nul(b"media.name\0").unwrap(),
-            MediaTitle => CStr::from_bytes_with_nul(b"media.title\0").unwrap(),
-            MediaArtist => CStr::from_bytes_with_nul(b"media.artist\0").unwrap(),
-            MediaCopyright => CStr::from_bytes_with_nul(b"media.copyright\0").unwrap(),
-            MediaSoftware => CStr::from_bytes_with_nul(b"media.software\0").unwrap(),
-            MediaLanguage => CStr::from_bytes_with_nul(b"media.language\0").unwrap(),
-            MediaFilename => CStr::from_bytes_with_nul(b"media.filename\0").unwrap(),
-            MediaIcon => CStr::from_bytes_with_nul(b"media.icon\0").unwrap(),
-            MediaIconName => CStr::from_bytes_with_nul(b"media.icon_name\0").unwrap(),
-            MediaRole => CStr::from_bytes_with_nul(b"media.role\0").unwrap(),
-            FilterWant => CStr::from_bytes_with_nul(b"filter.want\0").unwrap(),
-            FilterApply => CStr::from_bytes_with_nul(b"filter.apply\0").unwrap(),
-            FilterSuppress => CStr::from_bytes_with_nul(b"filter.suppress\0").unwrap(),
-            EventId => CStr::from_bytes_with_nul(b"event.id\0").unwrap(),
-            EventDescription => CStr::from_bytes_with_nul(b"event.description\0").unwrap(),
-            EventMouseX => CStr::from_bytes_with_nul(b"event.mouse.x\0").unwrap(),
-            EventMouseY => CStr::from_bytes_with_nul(b"event.mouse.y\0").unwrap(),
-            EventMouseHPos => CStr::from_bytes_with_nul(b"event.mouse.hpos\0").unwrap(),
-            EventMouseVPos => CStr::from_bytes_with_nul(b"event.mouse.vpos\0").unwrap(),
-            EventMouseButton => CStr::from_bytes_with_nul(b"event.mouse.button\0").unwrap(),
-            WindowName => CStr::from_bytes_with_nul(b"window.name\0").unwrap(),
-            WindowId => CStr::from_bytes_with_nul(b"window.id\0").unwrap(),
-            WindowIcon => CStr::from_bytes_with_nul(b"window.icon\0").unwrap(),
-            WindowIconName => CStr::from_bytes_with_nul(b"window.icon_name\0").unwrap(),
-            WindowX => CStr::from_bytes_with_nul(b"window.x\0").unwrap(),
-            WindowY => CStr::from_bytes_with_nul(b"window.y\0").unwrap(),
-            WindowWidth => CStr::from_bytes_with_nul(b"window.width\0").unwrap(),
-            WindowHeight => CStr::from_bytes_with_nul(b"window.height\0").unwrap(),
-            WindowHPos => CStr::from_bytes_with_nul(b"window.hpos\0").unwrap(),
-            WindowVPos => CStr::from_bytes_with_nul(b"window.vpos\0").unwrap(),
-            WindowDesktop => CStr::from_bytes_with_nul(b"window.desktop\0").unwrap(),
-            WindowX11Display => CStr::from_bytes_with_nul(b"window.x11.display\0").unwrap(),
-            WindowX11Screen => CStr::from_bytes_with_nul(b"window.x11.screen\0").unwrap(),
-            WindowX11Monitor => CStr::from_bytes_with_nul(b"window.x11.monitor\0").unwrap(),
-            WindowX11Xid => CStr::from_bytes_with_nul(b"window.x11.xid\0").unwrap(),
-            ApplicationName => CStr::from_bytes_with_nul(b"application.name\0").unwrap(),
-            ApplicationId => CStr::from_bytes_with_nul(b"application.id\0").unwrap(),
-            ApplicationVersion => CStr::from_bytes_with_nul(b"application.version\0").unwrap(),
-            ApplicationIcon => CStr::from_bytes_with_nul(b"application.icon\0").unwrap(),
-            ApplicationIconName => CStr::from_bytes_with_nul(b"application.icon_name\0").unwrap(),
-            ApplicationLanguage => CStr::from_bytes_with_nul(b"application.language\0").unwrap(),
-            ApplicationProcessId => CStr::from_bytes_with_nul(b"application.process.id\0").unwrap(),
+            MediaName => c"media.name",
+            MediaTitle => c"media.title",
+            MediaArtist => c"media.artist",
+            MediaCopyright => c"media.copyright",
+            MediaSoftware => c"media.software",
+            MediaLanguage => c"media.language",
+            MediaFilename => c"media.filename",
+            MediaIcon => c"media.icon",
+            MediaIconName => c"media.icon_name",
+            MediaRole => c"media.role",
+            FilterWant => c"filter.want",
+            FilterApply => c"filter.apply",
+            FilterSuppress => c"filter.suppress",
+            EventId => c"event.id",
+            EventDescription => c"event.description",
+            EventMouseX => c"event.mouse.x",
+            EventMouseY => c"event.mouse.y",
+            EventMouseHPos => c"event.mouse.hpos",
+            EventMouseVPos => c"event.mouse.vpos",
+            EventMouseButton => c"event.mouse.button",
+            WindowName => c"window.name",
+            WindowId => c"window.id",
+            WindowIcon => c"window.icon",
+            WindowIconName => c"window.icon_name",
+            WindowX => c"window.x",
+            WindowY => c"window.y",
+            WindowWidth => c"window.width",
+            WindowHeight => c"window.height",
+            WindowHPos => c"window.hpos",
+            WindowVPos => c"window.vpos",
+            WindowDesktop => c"window.desktop",
+            WindowX11Display => c"window.x11.display",
+            WindowX11Screen => c"window.x11.screen",
+            WindowX11Monitor => c"window.x11.monitor",
+            WindowX11Xid => c"window.x11.xid",
+            ApplicationName => c"application.name",
+            ApplicationId => c"application.id",
+            ApplicationVersion => c"application.version",
+            ApplicationIcon => c"application.icon",
+            ApplicationIconName => c"application.icon_name",
+            ApplicationLanguage => c"application.language",
+            ApplicationProcessId => c"application.process.id",
             ApplicationProcessBinary => {
-                CStr::from_bytes_with_nul(b"application.process.binary\0").unwrap()
+                c"application.process.binary"
             }
             ApplicationProcessUser => {
-                CStr::from_bytes_with_nul(b"application.process.user\0").unwrap()
+                c"application.process.user"
             }
             ApplicationProcessHost => {
-                CStr::from_bytes_with_nul(b"application.process.host\0").unwrap()
+                c"application.process.host"
             }
             ApplicationProcessMachineId => {
-                CStr::from_bytes_with_nul(b"application.process.machine_id\0").unwrap()
+                c"application.process.machine_id"
             }
             ApplicationProcessSessionId => {
-                CStr::from_bytes_with_nul(b"application.process.session_id\0").unwrap()
+                c"application.process.session_id"
             }
-            DeviceString => CStr::from_bytes_with_nul(b"device.string\0").unwrap(),
-            DeviceApi => CStr::from_bytes_with_nul(b"device.api\0").unwrap(),
-            DeviceDescription => CStr::from_bytes_with_nul(b"device.description\0").unwrap(),
-            DeviceBusPath => CStr::from_bytes_with_nul(b"device.bus_path\0").unwrap(),
-            DeviceSerial => CStr::from_bytes_with_nul(b"device.serial\0").unwrap(),
-            DeviceVendorId => CStr::from_bytes_with_nul(b"device.vendor.id\0").unwrap(),
-            DeviceVendorName => CStr::from_bytes_with_nul(b"device.vendor.name\0").unwrap(),
-            DeviceProductId => CStr::from_bytes_with_nul(b"device.product.id\0").unwrap(),
-            DeviceProductName => CStr::from_bytes_with_nul(b"device.product.name\0").unwrap(),
-            DeviceClass => CStr::from_bytes_with_nul(b"device.class\0").unwrap(),
-            DeviceFormFactor => CStr::from_bytes_with_nul(b"device.form_factor\0").unwrap(),
-            DeviceBus => CStr::from_bytes_with_nul(b"device.bus\0").unwrap(),
-            DeviceIcon => CStr::from_bytes_with_nul(b"device.icon\0").unwrap(),
-            DeviceIconName => CStr::from_bytes_with_nul(b"device.icon_name\0").unwrap(),
-            DeviceAccessMode => CStr::from_bytes_with_nul(b"device.access_mode\0").unwrap(),
-            DeviceMasterDevice => CStr::from_bytes_with_nul(b"device.master_device\0").unwrap(),
+            DeviceString => c"device.string",
+            DeviceApi => c"device.api",
+            DeviceDescription => c"device.description",
+            DeviceBusPath => c"device.bus_path",
+            DeviceSerial => c"device.serial",
+            DeviceVendorId => c"device.vendor.id",
+            DeviceVendorName => c"device.vendor.name",
+            DeviceProductId => c"device.product.id",
+            DeviceProductName => c"device.product.name",
+            DeviceClass => c"device.class",
+            DeviceFormFactor => c"device.form_factor",
+            DeviceBus => c"device.bus",
+            DeviceIcon => c"device.icon",
+            DeviceIconName => c"device.icon_name",
+            DeviceAccessMode => c"device.access_mode",
+            DeviceMasterDevice => c"device.master_device",
             DeviceBufferingBufferSize => {
-                CStr::from_bytes_with_nul(b"device.buffering.buffer_size\0").unwrap()
+                c"device.buffering.buffer_size"
             }
             DeviceBufferingFragmentSize => {
-                CStr::from_bytes_with_nul(b"device.buffering.fragment_size\0").unwrap()
+                c"device.buffering.fragment_size"
             }
-            DeviceProfileName => CStr::from_bytes_with_nul(b"device.profile.name\0").unwrap(),
-            DeviceIntendedRoles => CStr::from_bytes_with_nul(b"device.intended_roles\0").unwrap(),
+            DeviceProfileName => c"device.profile.name",
+            DeviceIntendedRoles => c"device.intended_roles",
             DeviceProfileDescription => {
-                CStr::from_bytes_with_nul(b"device.profile.description\0").unwrap()
+                c"device.profile.description"
             }
-            ModuleAuthor => CStr::from_bytes_with_nul(b"module.author\0").unwrap(),
-            ModuleDescription => CStr::from_bytes_with_nul(b"module.description\0").unwrap(),
-            ModuleUsage => CStr::from_bytes_with_nul(b"module.usage\0").unwrap(),
-            ModuleVersion => CStr::from_bytes_with_nul(b"module.version\0").unwrap(),
-            FormatSampleFormat => CStr::from_bytes_with_nul(b"format.sample_format\0").unwrap(),
-            FormatRate => CStr::from_bytes_with_nul(b"format.rate\0").unwrap(),
-            FormatChannels => CStr::from_bytes_with_nul(b"format.channels\0").unwrap(),
-            FormatChannelMap => CStr::from_bytes_with_nul(b"format.channel_map\0").unwrap(),
+            ModuleAuthor => c"module.author",
+            ModuleDescription => c"module.description",
+            ModuleUsage => c"module.usage",
+            ModuleVersion => c"module.version",
+            FormatSampleFormat => c"format.sample_format",
+            FormatRate => c"format.rate",
+            FormatChannels => c"format.channels",
+            FormatChannelMap => c"format.channel_map",
         }
     }
 

@@ -323,7 +323,7 @@ impl<'a> TagStructWriter<'a> {
 
     /// Writes a timestamp as a "timeval" with microsecond precision.
     pub fn write_timeval(&mut self, t: time::SystemTime) -> Result<(), ProtocolError> {
-        let d = t.duration_since(std::time::UNIX_EPOCH).unwrap();
+        let d = t.duration_since(time::UNIX_EPOCH).unwrap();
         let (secs, usecs) = (d.as_secs() as u32, d.subsec_micros());
 
         self.write_timeval_raw(secs, usecs)
