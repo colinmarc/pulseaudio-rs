@@ -1,5 +1,7 @@
-// To run this example, run the following command:
-//    cargo run --example playback -- testfiles/victory.wav
+//! A simple example that plays a WAV file to the server.
+//!
+//! Run with:
+//!    cargo run --example playback -- testfiles/victory.wav
 
 use std::{
     ffi::CString,
@@ -65,7 +67,7 @@ fn main() -> anyhow::Result<()> {
             },
             channel_map,
             cvolume: Some(protocol::ChannelVolume::norm(2)),
-            sink_name: Some(CString::new("@DEFAULT_SINK@")?),
+            sink_name: Some(protocol::DEFAULT_SINK.to_owned()),
             ..Default::default()
         }),
         protocol_version,

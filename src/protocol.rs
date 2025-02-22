@@ -5,7 +5,10 @@ mod serde;
 
 mod error;
 
-use std::io::{BufRead, Cursor, Read, Seek, SeekFrom, Write};
+use std::{
+    ffi::CStr,
+    io::{BufRead, Cursor, Read, Seek, SeekFrom, Write},
+};
 
 use bitflags::bitflags;
 use byteorder::NetworkEndian;
@@ -28,6 +31,12 @@ pub const DESCRIPTOR_SIZE: usize = 5 * 4;
 /// MAX_MEMBLOCKQ_LENGTH from the Pulse source. This is the maximum packet size
 /// for stream data, as well as the maximum buffer size, in bytes.
 pub const MAX_MEMBLOCKQ_LENGTH: usize = 4 * 1024 * 1024;
+
+/// The protocol uses this sink name to indicate the default sink.
+pub const DEFAULT_SINK: &CStr = c"@DEFAULT_SINK@";
+
+/// The protocol uses this source name to indicate the default source.
+pub const DEFAULT_SOURCE: &CStr = c"@DEFAULT_SOURCE@";
 
 bitflags! {
     /// Special message types.

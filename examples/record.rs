@@ -1,4 +1,5 @@
-//! A simple example that records audio from the default input.
+//! A simple example that records audio from the default input and saves it as
+//! a WAV file.
 //!
 //! Run with:
 //!     cargo run --example record /tmp/recording.wav
@@ -29,7 +30,7 @@ pub fn main() -> anyhow::Result<()> {
         sock.get_mut(),
         10,
         &protocol::Command::GetSourceInfo(protocol::GetSourceInfo {
-            name: Some(CString::new("@DEFAULT_SOURCE@")?),
+            name: Some(protocol::DEFAULT_SOURCE.to_owned()),
             ..Default::default()
         }),
         protocol_version,
