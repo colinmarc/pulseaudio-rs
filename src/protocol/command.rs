@@ -237,7 +237,7 @@ pub enum Command {
     // So-called introspection commands, to read back the state of the server.
     Stat,
     GetServerInfo,
-    GetCardInfo(u32),
+    GetCardInfo(GetCardInfo),
     GetCardInfoList,
     GetSinkInfo(GetSinkInfo),
     GetSinkInfoList,
@@ -433,7 +433,7 @@ impl Command {
             }
             CommandTag::RemoveClientProplist => Ok(Command::RemoveClientProplist),
             CommandTag::Extension => Ok(Command::Extension(ts.read()?)),
-            CommandTag::GetCardInfo => Ok(Command::GetCardInfo(ts.read_u32()?)),
+            CommandTag::GetCardInfo => Ok(Command::GetCardInfo(ts.read()?)),
             CommandTag::GetCardInfoList => Ok(Command::GetCardInfoList),
             CommandTag::SetCardProfile => Ok(Command::SetCardProfile(ts.read()?)),
             CommandTag::ClientEvent => Ok(Command::ClientEvent(ts.read()?)),
@@ -628,7 +628,7 @@ impl TagStructWrite for Command {
             Command::UpdateRecordStreamSampleRate(p) => w.write(p),
             Command::Stat => Ok(()),
             Command::GetServerInfo => Ok(()),
-            Command::GetCardInfo(id) => w.write_u32(*id),
+            Command::GetCardInfo(p) => w.write(p),
             Command::GetCardInfoList => Ok(()),
             Command::GetSinkInfo(p) => w.write(p),
             Command::GetSinkInfoList => Ok(()),

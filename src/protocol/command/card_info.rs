@@ -86,6 +86,38 @@ pub struct CardInfo {
     pub active_profile: Option<CString>,
 }
 
+/// The parameters for [`Command::GetCardInfo`]. Either the card index or the
+/// card name should be specified.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct GetCardInfo {
+    /// The index of the card to query.
+    pub index: Option<u32>,
+
+    /// The name of the card to query.
+    pub name: Option<CString>,
+}
+
+impl TagStructRead for GetCardInfo {
+    fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
+        Ok(Self {
+            index: ts.read_index()?,
+            name: ts.read_string()?,
+        })
+    }
+}
+
+impl TagStructWrite for GetCardInfo {
+    fn write(
+        &self,
+        w: &mut TagStructWriter<'_>,
+        _protocol_version: u16,
+    ) -> Result<(), ProtocolError> {
+        w.write_index(self.index)?;
+        w.write_string(self.name.as_ref())?;
+        Ok(())
+    }
+}
+
 impl CommandReply for CardInfo {}
 
 impl TagStructRead for CardInfo {
