@@ -9,7 +9,7 @@ pub(crate) const FLAG_SHM: u32 = 0x80000000;
 pub(crate) const FLAG_MEMFD: u32 = 0x40000000;
 
 /// The auth command is the first message a client should send on connection.
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
+#[derive(Default, Clone, Eq, PartialEq)]
 pub struct AuthParams {
     /// The client's protocol version.
     pub version: u16,
@@ -22,6 +22,18 @@ pub struct AuthParams {
 
     /// A password-like blob, usually created by the server at ~/.pulse-cookie.
     pub cookie: Vec<u8>,
+}
+
+// Avoid printing the cookie.
+impl std::fmt::Debug for AuthParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AuthParams")
+            .field("version", &self.version)
+            .field("supports_shm", &self.supports_shm)
+            .field("supports_memfd", &self.supports_memfd)
+            .field("cookie", &"<redacted>")
+            .finish()
+    }
 }
 
 impl TagStructRead for AuthParams {
