@@ -4,7 +4,7 @@ use super::CommandReply;
 
 /// The server response to [`super::Command::LookupSource`] and [`super::Command::LookupSink`].
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub struct LookupReply(u32);
+pub struct LookupReply(pub u32);
 
 impl CommandReply for LookupReply {}
 

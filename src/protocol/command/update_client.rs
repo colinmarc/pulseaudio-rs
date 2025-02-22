@@ -61,7 +61,7 @@ mod integration_tests {
         let (mut sock, protocol_version) = connect_and_init()?;
 
         let mut props = Props::new();
-        props.set(props::Prop::ApplicationName, CString::new("test")?);
+        props.set(Prop::ApplicationName, CString::new("test")?);
 
         write_command_message(
             sock.get_mut(),
