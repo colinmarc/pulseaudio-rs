@@ -90,3 +90,36 @@ pub enum PulseError {
     /// Device or resource busy. (since 0.9.17)
     Busy = 26,
 }
+
+impl std::fmt::Display for PulseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PulseError::AccessDenied => write!(f, "Access failure"),
+            PulseError::Command => write!(f, "Unknown command"),
+            PulseError::Invalid => write!(f, "Invalid argument"),
+            PulseError::Exist => write!(f, "Entity exists"),
+            PulseError::NoEntity => write!(f, "No such entity"),
+            PulseError::ConnectionRefused => write!(f, "Connection refused"),
+            PulseError::Protocol => write!(f, "Protocol error"),
+            PulseError::Timeout => write!(f, "Timeout"),
+            PulseError::AuthKey => write!(f, "No authentication key"),
+            PulseError::Internal => write!(f, "Internal error"),
+            PulseError::ConnectionTerminated => write!(f, "Connection terminated"),
+            PulseError::Killed => write!(f, "Entity killed"),
+            PulseError::InvalidServer => write!(f, "Invalid server"),
+            PulseError::ModInitFailed => write!(f, "Module initialization failed"),
+            PulseError::BadState => write!(f, "Bad state"),
+            PulseError::NoData => write!(f, "No data"),
+            PulseError::Version => write!(f, "Incompatible protocol version"),
+            PulseError::TooLarge => write!(f, "Data too large"),
+            PulseError::NotSupported => write!(f, "Operation not supported"),
+            PulseError::Unknown => write!(f, "The error code was unknown to the client"),
+            PulseError::NoExtension => write!(f, "Extension does not exist"),
+            PulseError::Obsolete => write!(f, "Obsolete functionality"),
+            PulseError::NotImplemented => write!(f, "Missing implementation"),
+            PulseError::Forked => write!(f, "Caller tried to reuse the context"),
+            PulseError::Io => write!(f, "An IO error occurred"),
+            PulseError::Busy => write!(f, "Device or resource busy"),
+        }
+    }
+}
