@@ -323,8 +323,8 @@ impl Command {
         let (command, seq) = (ts.read_enum()?, ts.read_u32()?);
 
         let cmd = match command {
-            CommandTag::Error => Err(ProtocolError::ServerError(ts.read_enum()?)),
             CommandTag::Timeout => Err(ProtocolError::Timeout),
+            CommandTag::Error => Ok(Command::Error(ts.read_enum()?)),
             CommandTag::Reply => Ok(Command::Reply),
 
             CommandTag::Exit => Ok(Command::Exit),
