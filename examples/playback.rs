@@ -152,11 +152,12 @@ fn main() -> anyhow::Result<()> {
                 )?;
             }
 
-            // This is a response to the timing info query we fired off just.
-            // The format of the reply depends on the command that we sent,
-            // so the library can't parse it for us -- so we parse it here.
+            // This is a response to the timing info query we fired off just
+            // above. The format of the reply depends on the command that we
+            // sent, so the library can't parse it for us -- so we parse it
+            // here.
             protocol::Command::Reply if seq == TIMING_INFO => {
-                let mut ts = protocol::serde::TagStructReader::new(&mut sock, protocol_version);
+                let mut ts = protocol::TagStructReader::new(&mut sock, protocol_version);
                 let timing_info = ts.read::<protocol::PlaybackLatency>()?;
 
                 // The response includes information that allows us to estimate playback latency.

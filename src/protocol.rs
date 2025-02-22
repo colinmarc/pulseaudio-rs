@@ -1,7 +1,7 @@
 //! An implementation of the PulseAudio IPC protocol.
 
 pub mod command;
-pub mod serde;
+mod serde;
 
 mod error;
 
