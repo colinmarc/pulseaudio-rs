@@ -262,7 +262,7 @@ fn proxy(conn: &mut Connection, direction: Direction) -> anyhow::Result<()> {
                                 pulse::write_command_message(
                                     dest,
                                     seq,
-                                    pulse::Command::Auth(auth),
+                                    &pulse::Command::Auth(auth),
                                     version,
                                 )?;
 

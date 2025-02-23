@@ -75,7 +75,7 @@ mod integration_tests {
     fn stat() -> Result<(), Box<dyn std::error::Error>> {
         let (mut sock, protocol_version) = connect_and_init()?;
 
-        write_command_message(sock.get_mut(), 0, Command::Stat, protocol_version)?;
+        write_command_message(sock.get_mut(), 0, &Command::Stat, protocol_version)?;
         let (_, info) = read_reply_message::<StatInfo>(&mut sock, protocol_version)?;
 
         assert!(info.memblock_total > 0);

@@ -197,7 +197,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::GetSourceOutputInfoList,
+            &Command::GetSourceOutputInfoList,
             protocol_version,
         )?;
 
@@ -213,7 +213,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             1,
-            Command::GetSourceOutputInfo(info_list[0].index),
+            &Command::GetSourceOutputInfo(info_list[0].index),
             protocol_version,
         )?;
 

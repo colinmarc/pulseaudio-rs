@@ -146,7 +146,7 @@ fn main() -> anyhow::Result<()> {
                                 protocol::write_command_message(
                                     &mut client.socket,
                                     u32::MAX,
-                                    protocol::Command::Request(protocol::Request {
+                                    &protocol::Command::Request(protocol::Request {
                                         channel: *id,
                                         length: bytes_needed as u32,
                                     }),
@@ -210,7 +210,7 @@ fn main() -> anyhow::Result<()> {
                                     write_error(
                                         &mut client.socket,
                                         u32::MAX,
-                                        protocol::PulseError::Protocol,
+                                        &protocol::PulseError::Protocol,
                                     )?;
 
                                     break 'read;
@@ -258,7 +258,11 @@ fn handle_command(
                 )?;
             } else {
                 // The client needs to authenticate.
-                protocol::write_error(&mut client.socket, seq, protocol::PulseError::AccessDenied)?;
+                protocol::write_error(
+                    &mut client.socket,
+                    seq,
+                    &protocol::PulseError::AccessDenied,
+                )?;
             }
         }
         // Then it has to set props.
@@ -277,7 +281,7 @@ fn handle_command(
             } else {
                 // PulseAudio requires this as part of the
                 // handshake, so we will too.
-                protocol::write_error(&mut client.socket, seq, protocol::PulseError::Protocol)?;
+                protocol::write_error(&mut client.socket, seq, &protocol::PulseError::Protocol)?;
             }
         }
         // We won't implement all the introspection
@@ -343,7 +347,7 @@ fn handle_command(
             protocol::write_error(
                 &mut client.socket,
                 seq,
-                protocol::PulseError::NotImplemented,
+                &protocol::PulseError::NotImplemented,
             )?;
         }
     }
@@ -379,7 +383,7 @@ fn handle_stream_write(
         protocol::write_command_message(
             &mut client.socket,
             u32::MAX,
-            protocol::Command::Overflow(overflow as u32),
+            &protocol::Command::Overflow(overflow as u32),
             client.protocol_version,
         )?;
 
@@ -396,7 +400,7 @@ fn handle_stream_write(
             protocol::write_command_message(
                 &mut client.socket,
                 u32::MAX,
-                protocol::Command::Started(desc.channel),
+                &protocol::Command::Started(desc.channel),
                 client.protocol_version,
             )?;
 

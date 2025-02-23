@@ -360,7 +360,7 @@ mod integration_tests {
         protocol::write_command_message(
             sock.get_mut(),
             0,
-            Command::GetCardInfoList,
+            &Command::GetCardInfoList,
             protocol_version,
         )?;
         let _ = protocol::read_reply_message::<CardInfoList>(&mut sock, protocol_version)?;

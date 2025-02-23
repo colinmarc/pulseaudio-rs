@@ -83,7 +83,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::PlaySample(PlaySampleParams {
+            &Command::PlaySample(PlaySampleParams {
                 sink_index: Some(999),
                 sink_name: None,
                 volume: 0,

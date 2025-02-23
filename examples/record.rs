@@ -28,7 +28,7 @@ pub fn main() -> anyhow::Result<()> {
     protocol::write_command_message(
         sock.get_mut(),
         10,
-        protocol::Command::GetSourceInfo(protocol::GetSourceInfo {
+        &protocol::Command::GetSourceInfo(protocol::GetSourceInfo {
             name: Some(CString::new("@DEFAULT_SOURCE@")?),
             ..Default::default()
         }),
@@ -46,7 +46,7 @@ pub fn main() -> anyhow::Result<()> {
     protocol::write_command_message(
         sock.get_mut(),
         99,
-        protocol::Command::CreateRecordStream(protocol::RecordStreamParams {
+        &protocol::Command::CreateRecordStream(protocol::RecordStreamParams {
             source_index: Some(source_info.index),
             sample_spec: protocol::SampleSpec {
                 format: source_info.sample_spec.format,
@@ -144,7 +144,7 @@ fn connect_and_init() -> anyhow::Result<(BufReader<UnixStream>, u16)> {
     protocol::write_command_message(
         sock.get_mut(),
         0,
-        protocol::Command::Auth(auth),
+        &protocol::Command::Auth(auth),
         protocol::MAX_VERSION,
     )?;
 
@@ -160,7 +160,7 @@ fn connect_and_init() -> anyhow::Result<(BufReader<UnixStream>, u16)> {
     protocol::write_command_message(
         sock.get_mut(),
         1,
-        protocol::Command::SetClientName(props),
+        &protocol::Command::SetClientName(props),
         protocol_version,
     )?;
 

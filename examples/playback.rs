@@ -57,7 +57,7 @@ fn main() -> anyhow::Result<()> {
     protocol::write_command_message(
         sock.get_mut(),
         99,
-        protocol::Command::CreatePlaybackStream(protocol::PlaybackStreamParams {
+        &protocol::Command::CreatePlaybackStream(protocol::PlaybackStreamParams {
             sample_spec: protocol::SampleSpec {
                 format,
                 channels: spec.channels as u8,
@@ -132,7 +132,7 @@ fn main() -> anyhow::Result<()> {
                         protocol::write_command_message(
                             sock.get_mut(),
                             DRAIN_COMPLETED,
-                            protocol::Command::DrainPlaybackStream(stream_info.channel),
+                            &protocol::Command::DrainPlaybackStream(stream_info.channel),
                             protocol_version,
                         )?;
 
@@ -144,7 +144,7 @@ fn main() -> anyhow::Result<()> {
                 protocol::write_command_message(
                     sock.get_mut(),
                     TIMING_INFO,
-                    protocol::Command::GetPlaybackLatency(protocol::LatencyParams {
+                    &protocol::Command::GetPlaybackLatency(protocol::LatencyParams {
                         channel,
                         now: time::SystemTime::now(),
                     }),
@@ -229,7 +229,7 @@ fn connect_and_init() -> anyhow::Result<(BufReader<UnixStream>, u16)> {
     protocol::write_command_message(
         sock.get_mut(),
         0,
-        protocol::Command::Auth(auth),
+        &protocol::Command::Auth(auth),
         protocol::MAX_VERSION,
     )?;
 
@@ -245,7 +245,7 @@ fn connect_and_init() -> anyhow::Result<(BufReader<UnixStream>, u16)> {
     protocol::write_command_message(
         sock.get_mut(),
         1,
-        protocol::Command::SetClientName(props),
+        &protocol::Command::SetClientName(props),
         protocol_version,
     )?;
 

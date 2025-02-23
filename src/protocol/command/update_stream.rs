@@ -356,7 +356,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::SetPlaybackStreamName(SetStreamNameParams {
+            &Command::SetPlaybackStreamName(SetStreamNameParams {
                 index: 999,
                 name: CString::new("stream").unwrap(),
             }),
@@ -377,7 +377,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::UpdatePlaybackStreamProplist(UpdatePropsParams {
+            &Command::UpdatePlaybackStreamProplist(UpdatePropsParams {
                 index: 999,
                 mode: props::PropsUpdateMode::Set,
                 props: Props::new(),
@@ -399,7 +399,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::UpdatePlaybackStreamSampleRate(UpdateSampleRateParams {
+            &Command::UpdatePlaybackStreamSampleRate(UpdateSampleRateParams {
                 index: 999,
                 sample_rate: 44100,
             }),

@@ -24,7 +24,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     protocol::write_command_message(
         sock.get_mut(),
         0,
-        protocol::Command::Auth(auth),
+        &protocol::Command::Auth(auth),
         protocol::MAX_VERSION,
     )?;
     let (_, auth_info) =
@@ -40,7 +40,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     protocol::write_command_message(
         sock.get_mut(),
         1,
-        protocol::Command::SetClientName(props),
+        &protocol::Command::SetClientName(props),
         protocol_version,
     )?;
 
@@ -51,7 +51,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     protocol::write_command_message(
         sock.get_mut(),
         2,
-        protocol::Command::GetSinkInfoList,
+        &protocol::Command::GetSinkInfoList,
         protocol_version,
     )?;
 

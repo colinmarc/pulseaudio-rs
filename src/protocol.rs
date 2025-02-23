@@ -71,7 +71,7 @@ pub fn read_descriptor<R: Read>(r: &mut R) -> Result<Descriptor, ProtocolError> 
 }
 
 /// Writes a message header to an output stream.
-pub fn write_descriptor<W: Write>(w: &mut W, desc: Descriptor) -> Result<(), ProtocolError> {
+pub fn write_descriptor<W: Write>(w: &mut W, desc: &Descriptor) -> Result<(), ProtocolError> {
     use byteorder::WriteBytesExt;
 
     w.write_u32::<NetworkEndian>(desc.length)?;
@@ -80,6 +80,14 @@ pub fn write_descriptor<W: Write>(w: &mut W, desc: Descriptor) -> Result<(), Pro
     w.write_u32::<NetworkEndian>(desc.flags.bits())?;
 
     Ok(())
+}
+
+/// Encodes a message header to a buffer.
+pub fn encode_descriptor(buf: &mut [u8; DESCRIPTOR_SIZE], desc: &Descriptor) {
+    buf[0..4].copy_from_slice(&desc.length.to_be_bytes());
+    buf[4..8].copy_from_slice(&desc.channel.to_be_bytes());
+    buf[8..16].copy_from_slice(&desc.offset.to_be_bytes());
+    buf[16..20].copy_from_slice(&desc.flags.bits().to_be_bytes());
 }
 
 /// Reads a command message from an input stream. If the result is
@@ -96,8 +104,8 @@ pub fn read_command_message<R: BufRead>(
 /// Writes a command message to a buffer, and returns the number of bytes
 /// written.
 pub fn encode_command_message<T: AsRef<[u8]>>(
-    command: Command,
     seq: u32,
+    command: &Command,
     buf: T,
     protocol_version: u16,
 ) -> Result<usize, ProtocolError>
@@ -120,7 +128,7 @@ where
     };
 
     cursor.set_position(0);
-    write_descriptor(&mut cursor, desc)?;
+    write_descriptor(&mut cursor, &desc)?;
 
     Ok(length as usize + DESCRIPTOR_SIZE)
 }
@@ -131,7 +139,7 @@ where
 pub fn write_command_message<W: Write>(
     w: &mut W,
     seq: u32,
-    command: Command,
+    command: &Command,
     protocol_version: u16,
 ) -> Result<(), ProtocolError> {
     let mut buf = Cursor::new(Vec::new());
@@ -149,7 +157,7 @@ pub fn write_command_message<W: Write>(
         flags: DescriptorFlags::empty(),
     };
 
-    write_descriptor(w, desc)?;
+    write_descriptor(w, &desc)?;
     w.write_all(buf.into_inner().as_slice())?;
 
     Ok(())
@@ -179,7 +187,7 @@ pub fn read_reply_message<T: CommandReply>(
 /// Writes reply data to a buffer, and returns the number of bytes written.
 pub fn encode_reply_message<T: AsRef<[u8]>, R: CommandReply>(
     seq: u32,
-    reply: R,
+    reply: &R,
     buf: T,
     protocol_version: u16,
 ) -> Result<usize, ProtocolError>
@@ -206,7 +214,7 @@ where
     };
 
     cursor.set_position(0);
-    write_descriptor(&mut cursor, desc)?;
+    write_descriptor(&mut cursor, &desc)?;
 
     Ok(length as usize + DESCRIPTOR_SIZE)
 }
@@ -238,7 +246,7 @@ pub fn write_reply_message<W: Write, R: CommandReply>(
         flags: DescriptorFlags::empty(),
     };
 
-    write_descriptor(w, desc)?;
+    write_descriptor(w, &desc)?;
     w.write_all(buf.into_inner().as_slice())?;
 
     Ok(())
@@ -293,7 +301,7 @@ where
     };
 
     cursor.set_position(0);
-    write_descriptor(&mut cursor, desc)?;
+    write_descriptor(&mut cursor, &desc)?;
 
     Ok(length as usize + DESCRIPTOR_SIZE)
 }
@@ -307,7 +315,7 @@ pub fn write_ack_message<W: Write>(w: &mut W, seq: u32) -> Result<(), ProtocolEr
         flags: DescriptorFlags::empty(),
     };
 
-    write_descriptor(w, desc)?;
+    write_descriptor(w, &desc)?;
 
     // Protocol version doesn't matter for this.
     let mut ts = TagStructWriter::new(w, MAX_VERSION);
@@ -319,7 +327,7 @@ pub fn write_ack_message<W: Write>(w: &mut W, seq: u32) -> Result<(), ProtocolEr
 }
 
 /// Write an error reply to a client. This is equivalent to [`write_command_message`] with [`Command::Error`].
-pub fn write_error<W: Write>(w: &mut W, seq: u32, error: PulseError) -> Result<(), ProtocolError> {
+pub fn write_error<W: Write>(w: &mut W, seq: u32, error: &PulseError) -> Result<(), ProtocolError> {
     let desc = Descriptor {
         length: 15, // Three tagged u32s.
         channel: u32::MAX,
@@ -327,14 +335,14 @@ pub fn write_error<W: Write>(w: &mut W, seq: u32, error: PulseError) -> Result<(
         flags: DescriptorFlags::empty(),
     };
 
-    write_descriptor(w, desc)?;
+    write_descriptor(w, &desc)?;
 
     // Protocol version doesn't matter for this.
     let mut ts = TagStructWriter::new(w, MAX_VERSION);
 
     ts.write_u32(CommandTag::Error as u32)?;
     ts.write_u32(seq)?;
-    ts.write_u32(error as u32)?;
+    ts.write_u32(*error as u32)?;
 
     Ok(())
 }

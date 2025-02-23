@@ -365,7 +365,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::GetSourceInfoList,
+            &Command::GetSourceInfoList,
             protocol_version,
         )?;
 
@@ -376,7 +376,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             1,
-            Command::GetSourceInfo(GetSourceInfo {
+            &Command::GetSourceInfo(GetSourceInfo {
                 index: Some(info_list[0].index),
                 ..Default::default()
             }),

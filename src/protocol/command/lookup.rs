@@ -50,7 +50,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::GetSinkInfoList,
+            &Command::GetSinkInfoList,
             protocol_version,
         )?;
         let (_, info) = read_reply_message::<SinkInfoList>(&mut sock, protocol_version)?;
@@ -60,7 +60,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             1,
-            Command::LookupSink(sink_name),
+            &Command::LookupSink(sink_name),
             protocol_version,
         )?;
 

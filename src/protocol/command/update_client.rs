@@ -66,7 +66,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::UpdateClientProplist(UpdateClientProplistParams {
+            &Command::UpdateClientProplist(UpdateClientProplistParams {
                 mode: props::PropsUpdateMode::Replace,
                 props,
             }),

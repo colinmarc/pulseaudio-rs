@@ -74,7 +74,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::SetCardProfile(SetCardProfileParams {
+            &Command::SetCardProfile(SetCardProfileParams {
                 card_index: Some(999),
                 card_name: None,
                 profile_name: CString::new("profile").unwrap(),

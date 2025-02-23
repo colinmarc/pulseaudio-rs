@@ -117,7 +117,7 @@ mod integration_test_util {
             cookie,
         };
 
-        write_command_message(sock.get_mut(), 0, Command::Auth(auth), MAX_VERSION)
+        write_command_message(sock.get_mut(), 0, &Command::Auth(auth), MAX_VERSION)
             .context("sending auth command failed")?;
         let (_, auth_reply) =
             read_reply_message::<AuthReply>(sock, MAX_VERSION).context("auth command failed")?;
@@ -129,7 +129,7 @@ mod integration_test_util {
         write_command_message(
             sock.get_mut(),
             1,
-            Command::SetClientName(props),
+            &Command::SetClientName(props),
             protocol_version,
         )
         .context("sending set_client_name command failed")?;

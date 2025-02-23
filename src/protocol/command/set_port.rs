@@ -74,7 +74,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::SetSinkPort(SetPortParams {
+            &Command::SetSinkPort(SetPortParams {
                 index: Some(999),
                 name: None,
                 port_name: CString::new("port").unwrap(),

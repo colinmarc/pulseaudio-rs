@@ -135,7 +135,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::CreateUploadStream(UploadStreamParams {
+            &Command::CreateUploadStream(UploadStreamParams {
                 media_name: Some(CString::new("media_name")?),
                 sample_spec: SampleSpec {
                     format: SampleFormat::S16Le,

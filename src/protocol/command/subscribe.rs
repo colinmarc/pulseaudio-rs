@@ -175,7 +175,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::Subscribe(mask),
+            &Command::Subscribe(mask),
             protocol_version,
         )?;
         assert_eq!(0, read_ack_message(&mut sock).context("error reading ack")?);

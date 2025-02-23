@@ -78,7 +78,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::SetPortLatencyOffset(SetPortLatencyOffsetParams {
+            &Command::SetPortLatencyOffset(SetPortLatencyOffsetParams {
                 index: None,
                 name: Some(CString::new("name").unwrap()),
                 port_name: CString::new("port").unwrap(),

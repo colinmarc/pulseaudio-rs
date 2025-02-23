@@ -202,7 +202,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::SetSinkVolume(SetDeviceVolumeParams {
+            &Command::SetSinkVolume(SetDeviceVolumeParams {
                 device_index: Some(999),
                 device_name: None,
                 volume: ChannelVolume::default(),
@@ -224,7 +224,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::SetSinkInputVolume(SetStreamVolumeParams {
+            &Command::SetSinkInputVolume(SetStreamVolumeParams {
                 index: 999,
                 volume: ChannelVolume::default(),
             }),
@@ -245,7 +245,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::SetSinkMute(SetDeviceMuteParams {
+            &Command::SetSinkMute(SetDeviceMuteParams {
                 device_index: Some(999),
                 device_name: None,
                 mute: false,
@@ -267,7 +267,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::SetSinkInputMute(SetStreamMuteParams {
+            &Command::SetSinkInputMute(SetStreamMuteParams {
                 index: 999,
                 mute: false,
             }),

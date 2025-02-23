@@ -110,7 +110,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::GetClientInfoList,
+            &Command::GetClientInfoList,
             protocol_version,
         )?;
         let (seq, info_list) = read_reply_message::<ClientInfoList>(&mut sock, protocol_version)?;

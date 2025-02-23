@@ -71,7 +71,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::SuspendSink(SuspendParams {
+            &Command::SuspendSink(SuspendParams {
                 device_index: Some(999),
                 device_name: None,
                 suspend: true,

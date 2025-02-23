@@ -343,7 +343,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::CreatePlaybackStream(PlaybackStreamParams {
+            &Command::CreatePlaybackStream(PlaybackStreamParams {
                 sample_spec: SampleSpec {
                     format: SampleFormat::S16Le,
                     sample_rate: 44100,

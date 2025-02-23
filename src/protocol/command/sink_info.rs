@@ -430,7 +430,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::GetSinkInfoList,
+            &Command::GetSinkInfoList,
             protocol_version,
         )?;
 

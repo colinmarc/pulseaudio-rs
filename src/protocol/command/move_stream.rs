@@ -68,7 +68,7 @@ mod integration_tests {
         write_command_message(
             sock.get_mut(),
             0,
-            Command::MoveSinkInput(MoveStreamParams {
+            &Command::MoveSinkInput(MoveStreamParams {
                 index: Some(999),
                 device_index: Some(999),
                 device_name: None,
