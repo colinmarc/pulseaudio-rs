@@ -38,7 +38,7 @@ bitflags! {
 }
 
 /// Packet descriptor / header.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Descriptor {
     /// Payload length in Bytes.
     pub length: u32,
@@ -103,10 +103,10 @@ pub fn read_command_message<R: BufRead>(
 
 /// Writes a command message to a buffer, and returns the number of bytes
 /// written.
-pub fn encode_command_message<T: AsRef<[u8]>>(
+pub fn encode_command_message<T>(
+    buf: T,
     seq: u32,
     command: &Command,
-    buf: T,
     protocol_version: u16,
 ) -> Result<usize, ProtocolError>
 where
@@ -127,7 +127,7 @@ where
         flags: DescriptorFlags::empty(),
     };
 
-    cursor.set_position(0);
+    cursor.seek(SeekFrom::Start(0))?;
     write_descriptor(&mut cursor, &desc)?;
 
     Ok(length as usize + DESCRIPTOR_SIZE)
@@ -185,10 +185,10 @@ pub fn read_reply_message<T: CommandReply>(
 }
 
 /// Writes reply data to a buffer, and returns the number of bytes written.
-pub fn encode_reply_message<T: AsRef<[u8]>, R: CommandReply>(
+pub fn encode_reply_message<T, R: CommandReply>(
+    buf: T,
     seq: u32,
     reply: &R,
-    buf: T,
     protocol_version: u16,
 ) -> Result<usize, ProtocolError>
 where
@@ -277,7 +277,7 @@ pub fn read_ack_message(r: &mut impl BufRead) -> Result<u32, ProtocolError> {
 
 /// Writes an ack (an empty reply) to a buffer, and returns the number of bytes
 /// written.
-pub fn encode_ack_message<T: AsRef<[u8]>>(seq: u32, buf: T) -> Result<usize, ProtocolError>
+pub fn encode_ack_message<T>(seq: u32, buf: T) -> Result<usize, ProtocolError>
 where
     Cursor<T>: Seek + Write,
 {
