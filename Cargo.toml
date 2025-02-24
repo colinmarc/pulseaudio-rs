@@ -4,7 +4,10 @@ description = "A native rust implementation of the PulseAudio protocol."
 repository = "https://github.com/colinmarc/pulseaudio-rs"
 edition = "2021"
 version = "0.2.1"
-authors = ["Colin Marc <hi@colinmarc.com>", "Jonas Schievink <jonasschievink@gmail.com>"]
+authors = [
+    "Colin Marc <hi@colinmarc.com>",
+    "Jonas Schievink <jonasschievink@gmail.com>",
+]
 license = "MIT"
 
 [workspace]
@@ -22,7 +25,7 @@ anyhow = "1.0.76"
 assert_matches = "1.5.0"
 hound = "3.5.1"
 indicatif = "0.17.7"
-mio = { version = "0.8.10", features = ["os-ext", "os-poll", "net"] }
+mio = { version = "1", features = ["os-ext", "os-poll", "net"] }
 mio-timerfd = "0.2.0"
 pretty_assertions = "1.4.0"
 
