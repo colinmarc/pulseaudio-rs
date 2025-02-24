@@ -361,8 +361,113 @@ pub fn write_memblock<W: Write>(
         flags: DescriptorFlags::empty(),
     };
 
-    write_descriptor(w, desc)?;
+    write_descriptor(w, &desc)?;
     w.write_all(chunk)?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+    use std::io::Cursor;
+
+    #[test]
+    fn roundtrip_descriptor() {
+        let expected = Descriptor {
+            length: 1024,
+            channel: 1,
+            offset: 0,
+            flags: DescriptorFlags::FLAG_SHMRELEASE,
+        };
+
+        let mut buf = vec![0; DESCRIPTOR_SIZE];
+        encode_descriptor((&mut buf[..DESCRIPTOR_SIZE]).try_into().unwrap(), &expected);
+
+        let descriptor = read_descriptor(&mut Cursor::new(&buf)).unwrap();
+        assert_eq!(expected, descriptor);
+
+        let mut buf = Vec::new();
+        write_descriptor(&mut buf, &expected).unwrap();
+
+        let descriptor = read_descriptor(&mut Cursor::new(&buf)).unwrap();
+        assert_eq!(expected, descriptor);
+    }
+
+    #[test]
+    fn roundtrip_command_message() {
+        let expected = Command::Auth(AuthParams {
+            version: 13,
+            supports_shm: true,
+            supports_memfd: false,
+            cookie: vec![1, 2, 3, 4],
+        });
+        let expected_seq = 1;
+        let protocol_version = MAX_VERSION;
+        let mut buf = vec![];
+
+        let size =
+            encode_command_message(&mut buf, expected_seq, &expected, protocol_version).unwrap();
+
+        let mut cursor = Cursor::new(&buf);
+        let (seq, command) = read_command_message(&mut cursor, protocol_version).unwrap();
+        assert_eq!(seq, expected_seq);
+        assert_eq!(expected, command);
+        assert_eq!(size, cursor.position() as usize);
+
+        let mut buf = Vec::new();
+        write_command_message(&mut buf, expected_seq, &expected, protocol_version).unwrap();
+
+        let (seq, command) =
+            read_command_message(&mut Cursor::new(&buf), protocol_version).unwrap();
+        assert_eq!(expected_seq, seq);
+        assert_eq!(expected, command);
+    }
+
+    #[test]
+    fn roundtrip_reply_message() {
+        let expected = ServerInfo {
+            server_name: Some(c"test server".to_owned()),
+            ..Default::default()
+        };
+        let expected_seq = 1;
+        let protocol_version = MAX_VERSION;
+        let mut buf = vec![];
+
+        let size =
+            encode_reply_message(&mut buf, expected_seq, &expected, protocol_version).unwrap();
+
+        let mut cursor = Cursor::new(&buf);
+        let (seq, reply) = read_reply_message(&mut cursor, protocol_version).unwrap();
+        assert_eq!(expected_seq, seq);
+        assert_eq!(expected, reply);
+        assert_eq!(size, cursor.position() as usize);
+
+        let mut buf = Vec::new();
+        write_reply_message(&mut buf, expected_seq, &expected, protocol_version).unwrap();
+
+        let (seq, reply) = read_reply_message(&mut Cursor::new(&buf), protocol_version).unwrap();
+        assert_eq!(expected_seq, seq);
+        assert_eq!(expected, reply);
+    }
+
+    #[test]
+    fn roundtrip_ack_message() {
+        let expected_seq = 1;
+        let mut buf = vec![];
+
+        let size = encode_ack_message(expected_seq, &mut buf).unwrap();
+
+        let mut cursor = Cursor::new(&buf);
+        let seq = read_ack_message(&mut cursor).unwrap();
+        assert_eq!(expected_seq, seq);
+        assert_eq!(size, cursor.position() as usize);
+
+        let mut buf = Vec::new();
+        write_ack_message(&mut buf, seq).unwrap();
+
+        let seq = read_ack_message(&mut Cursor::new(&buf)).unwrap();
+        assert_eq!(expected_seq, seq);
+    }
 }
