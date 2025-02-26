@@ -25,6 +25,10 @@ pub const MAX_VERSION: u16 = 35;
 /// The size of a message header.
 pub const DESCRIPTOR_SIZE: usize = 5 * 4;
 
+/// MAX_MEMBLOCKQ_LENGTH from the Pulse source. This is the maximum packet size
+/// for stream data, as well as the maximum buffer size, in bytes.
+pub const MAX_MEMBLOCKQ_LENGTH: usize = 4 * 1024 * 1024;
+
 bitflags! {
     /// Special message types.
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
