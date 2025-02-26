@@ -179,7 +179,7 @@ impl TagStructWrite for RecordStreamParams {
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct CreateRecordStreamReply {
     /// Channel ID, which is used in other commands to refer to this stream.
-    pub channel_index: u32,
+    pub channel: u32,
 
     /// Server-internal stream ID.
     pub stream_index: u32,
@@ -214,7 +214,7 @@ impl CommandReply for CreateRecordStreamReply {}
 impl TagStructRead for CreateRecordStreamReply {
     fn read(ts: &mut TagStructReader<'_>, protocol_version: u16) -> Result<Self, ProtocolError> {
         Ok(Self {
-            channel_index: ts
+            channel: ts
                 .read_index()?
                 .ok_or_else(|| ProtocolError::Invalid("invalid channel_index".into()))?,
             stream_index: ts
@@ -248,7 +248,7 @@ impl TagStructWrite for CreateRecordStreamReply {
         w: &mut TagStructWriter<'_>,
         protocol_version: u16,
     ) -> Result<(), ProtocolError> {
-        w.write_u32(self.channel_index)?;
+        w.write_u32(self.channel)?;
         w.write_u32(self.stream_index)?;
         w.write_u32(self.buffer_attr.max_length)?;
         w.write_u32(self.buffer_attr.fragment_size)?;
@@ -292,7 +292,7 @@ mod tests {
     #[test]
     fn reply_serde() -> anyhow::Result<()> {
         let reply = CreateRecordStreamReply {
-            channel_index: 0,
+            channel: 0,
             stream_index: 1,
             sink_index: 2,
             ..Default::default()

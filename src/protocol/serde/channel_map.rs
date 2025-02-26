@@ -3,7 +3,7 @@
 use std::fmt;
 
 use super::*;
-use crate::protocol::sample_spec::CHANNELS_MAX;
+use crate::protocol::sample_spec::MAX_CHANNELS;
 use crate::protocol::ProtocolError;
 
 use enum_primitive_derive::Primitive;
@@ -93,7 +93,7 @@ pub struct ChannelMap {
     /// Number of channels in the map.
     channels: u8,
     /// Channel position map.
-    map: [ChannelPosition; CHANNELS_MAX as usize],
+    map: [ChannelPosition; MAX_CHANNELS as usize],
 }
 
 impl Default for ChannelMap {
@@ -109,7 +109,7 @@ impl ChannelMap {
     pub fn empty() -> Self {
         ChannelMap {
             channels: 0,
-            map: [Default::default(); CHANNELS_MAX as usize],
+            map: [Default::default(); MAX_CHANNELS as usize],
         }
     }
 
@@ -117,7 +117,7 @@ impl ChannelMap {
     pub fn mono() -> Self {
         Self {
             channels: 1,
-            map: [Default::default(); CHANNELS_MAX as usize],
+            map: [Default::default(); MAX_CHANNELS as usize],
         }
     }
 
@@ -131,9 +131,9 @@ impl ChannelMap {
 
     /// Tries to append another `ChannelPosition` to the end of this map.
     ///
-    /// Panics if the map already has CHANNEL_MAX channels.
+    /// Panics if the map already has MAX_CHANNELS channels.
     pub fn push(&mut self, position: ChannelPosition) {
-        if self.channels < CHANNELS_MAX {
+        if self.channels < MAX_CHANNELS {
             self.map[self.channels as usize] = position;
             self.channels += 1;
         } else {
@@ -188,10 +188,10 @@ impl TagStructRead for ChannelMap {
         ts.expect_tag(Tag::ChannelMap)?;
 
         let channels = ts.inner.read_u8()?;
-        if channels > CHANNELS_MAX {
+        if channels > MAX_CHANNELS {
             return Err(ProtocolError::Invalid(format!(
                 "channel map too large (max is {} channels, got {})",
-                CHANNELS_MAX, channels
+                MAX_CHANNELS, channels
             )));
         }
 

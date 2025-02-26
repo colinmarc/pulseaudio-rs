@@ -54,13 +54,13 @@ pub enum SinkState {
     Suspended = 2,
 }
 
-/// A sink connected to a PulseAudio server. if necessary).
+/// A sink connected to a PulseAudio server.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct SinkInfo {
     /// Server-internal sink ID.
     pub index: u32,
 
-    /// The human readable name of the sink.
+    /// The human-readable name of the sink.
     pub name: CString,
 
     /// A description of the sink.
@@ -76,7 +76,7 @@ pub struct SinkInfo {
     pub sample_spec: SampleSpec,
 
     /// The mapping of channels to positions that the sink expects.
-    pub channel_map: ChannelMap, // make sure channel map length == sample spec channels
+    pub channel_map: ChannelMap,
 
     /// The ID of the module that owns this sink.
     pub owner_module_index: Option<u32>,

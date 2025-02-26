@@ -7,7 +7,7 @@ use byteorder::NetworkEndian;
 
 use crate::protocol::ProtocolError;
 
-use super::sample_spec::CHANNELS_MAX;
+use super::sample_spec::MAX_CHANNELS;
 use super::*;
 
 const VOLUME_NORM: u32 = 0x10000;
@@ -113,14 +113,14 @@ impl TagStructWrite for Volume {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ChannelVolume {
     channels: u8,
-    volumes: [Volume; CHANNELS_MAX as usize],
+    volumes: [Volume; MAX_CHANNELS as usize],
 }
 
 impl Default for ChannelVolume {
     fn default() -> Self {
         Self {
             channels: 1,
-            volumes: [Volume::MUTED; CHANNELS_MAX as usize],
+            volumes: [Volume::MUTED; MAX_CHANNELS as usize],
         }
     }
 }
@@ -131,7 +131,7 @@ impl ChannelVolume {
     pub fn empty() -> Self {
         Self {
             channels: 0,
-            volumes: [Volume::MUTED; CHANNELS_MAX as usize],
+            volumes: [Volume::MUTED; MAX_CHANNELS as usize],
         }
     }
 
@@ -139,7 +139,7 @@ impl ChannelVolume {
     pub fn muted(channels: usize) -> ChannelVolume {
         Self {
             channels: channels as u8,
-            volumes: [Volume::MUTED; CHANNELS_MAX as usize],
+            volumes: [Volume::MUTED; MAX_CHANNELS as usize],
         }
     }
 
@@ -147,7 +147,7 @@ impl ChannelVolume {
     pub fn norm(channels: usize) -> ChannelVolume {
         Self {
             channels: channels as u8,
-            volumes: [Volume::NORM; CHANNELS_MAX as usize],
+            volumes: [Volume::NORM; MAX_CHANNELS as usize],
         }
     }
 
@@ -155,7 +155,7 @@ impl ChannelVolume {
     ///
     /// Returns the channel for which the volume was added.
     pub fn push(&mut self, volume: Volume) {
-        if self.channels < CHANNELS_MAX {
+        if self.channels < MAX_CHANNELS {
             self.volumes[self.channels as usize] = volume;
             self.channels += 1;
         }
@@ -192,10 +192,10 @@ impl TagStructRead for ChannelVolume {
     fn read(ts: &mut TagStructReader<'_>, _protocol_version: u16) -> Result<Self, ProtocolError> {
         ts.expect_tag(Tag::CVolume)?;
         let n_channels = ts.inner.read_u8()?;
-        if n_channels == 0 || n_channels > CHANNELS_MAX {
+        if n_channels == 0 || n_channels > MAX_CHANNELS {
             return Err(ProtocolError::Invalid(format!(
                 "invalid cvolume channel count {}, must be between 1 and {}",
-                n_channels, CHANNELS_MAX
+                n_channels, MAX_CHANNELS
             )));
         }
 
@@ -258,6 +258,4 @@ mod tests {
         assert_eq!(Volume::NORM.to_db(), 0.0);
         assert_eq!(Volume::MUTED.to_db(), -f32::INFINITY);
     }
-
-    // TODO quickcheck to_linear from_linear round trip
 }

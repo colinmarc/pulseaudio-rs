@@ -1,12 +1,17 @@
 //! Sample specification data type.
 
 use enum_primitive_derive::Primitive;
+use num_traits::Euclid;
 
 use super::*;
 use crate::protocol::ProtocolError;
 
-/// Maximum number of channels.
-pub const CHANNELS_MAX: u8 = 32;
+/// PA_RATE_MAX from the Pulse source. This is the maximum sample rate, in Hz.
+pub const MAX_RATE: u32 = 48000 * 16;
+
+/// PA_CHANNEL_MAX from the Pulse source. This is the maximum number of channels
+/// supported for streams.
+pub const MAX_CHANNELS: u8 = 32;
 
 /// Describes how individual samples are encoded.
 #[derive(Debug, Copy, Clone, Primitive, PartialEq, Eq, Default)]
