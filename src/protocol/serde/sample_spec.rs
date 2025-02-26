@@ -77,6 +77,18 @@ pub struct SampleSpec {
 }
 
 impl SampleSpec {
+    /// For a given byte length, calculates how many samples it contains,
+    /// divided by the sample rate.
+    pub fn bytes_to_duration(&self, len: usize) -> time::Duration {
+        let frames = len / self.format.bytes_per_sample() / self.channels as usize;
+        let (secs, rem) = (frames as u32).div_rem_euclid(&self.sample_rate);
+
+        const NANOS_PER_SECOND: u64 = 1_000_000_000;
+        let nanos = (rem as u64 * NANOS_PER_SECOND) / self.sample_rate as u64;
+
+        time::Duration::new(secs as u64, nanos as u32)
+    }
+
     /// Modifies a `SampleSpec` to be compatible with a different `protocol_version` so that older
     /// clients can understand it.
     pub fn protocol_downgrade(self, protocol_version: u16) -> SampleSpec {
@@ -144,6 +156,23 @@ mod tests {
     use crate::protocol::test_util::test_serde;
 
     use super::*;
+
+    #[test]
+    fn bytes_to_duration() {
+        // 2 bytes per sample, 4 bytes per frame, 48 frames per millisecond.
+        let spec = SampleSpec {
+            format: SampleFormat::S16Le,
+            channels: 2,
+            sample_rate: 48000,
+        };
+
+        assert_eq!(spec.bytes_to_duration(48000 * 4).as_millis(), 1000);
+        assert_eq!(spec.bytes_to_duration(1920).as_millis(), 10);
+
+        // Attempt to trigger an overflow.
+        assert_eq!(spec.bytes_to_duration(usize::MAX).as_millis(), 89478485);
+        assert_eq!(spec.bytes_to_duration((48000 * 400) - 1).as_millis(), 99999);
+    }
 
     #[test]
     fn sample_spec_serde() -> anyhow::Result<()> {
