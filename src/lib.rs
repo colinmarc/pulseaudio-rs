@@ -19,7 +19,9 @@
 
 use std::path::PathBuf;
 
+mod client;
 pub mod protocol;
+pub use client::*;
 
 /// Attempts to determine the socket path from the runtime environment, checking
 /// the following locations in order:
