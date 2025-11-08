@@ -13,6 +13,8 @@ pub struct PlaybackStreamParams {
     pub sample_spec: SampleSpec,
 
     /// Channel map for the stream.
+    ///
+    /// Number of channels should match `sample_spec.channels`.
     pub channel_map: ChannelMap,
 
     /// Index of the sink to connect to.
@@ -28,6 +30,8 @@ pub struct PlaybackStreamParams {
     pub sync_id: u32,
 
     /// Volume of the stream.
+    ///
+    /// Number of channels should match `sample_spec.channels`.
     pub cvolume: Option<ChannelVolume>,
 
     /// Additional properties for the stream.
@@ -144,7 +148,10 @@ impl TagStructWrite for PlaybackStreamParams {
         ts.write_u32(self.buffer_attr.pre_buffering)?;
         ts.write_u32(self.buffer_attr.minimum_request_length)?;
         ts.write_u32(self.sync_id)?;
-        ts.write(self.cvolume.unwrap_or_default())?;
+        ts.write(
+            self.cvolume
+                .unwrap_or_else(|| ChannelVolume::muted(self.sample_spec.channels)),
+        )?;
         ts.write_bool(self.flags.no_remap_channels)?;
         ts.write_bool(self.flags.no_remix_channels)?;
         ts.write_bool(self.flags.fix_format)?;
@@ -364,6 +371,64 @@ mod integration_tests {
         )?;
 
         let _ = read_reply_message::<CreatePlaybackStreamReply>(&mut sock, protocol_version)?;
+
+        Ok(())
+    }
+
+    /// Tests that PlaybackStreamParams maintains consistent
+    /// channel counts across its implicitly set fields.
+    #[test]
+    fn create_playback_stream_channel_count_invariants() -> anyhow::Result<()> {
+        let (mut sock, protocol_version) = connect_and_init()?;
+
+        // Arbitrarily chosen number of channels that should be kept in sync
+        // across fields (chosen to test beyond the usual 1 or 2).
+        const CHANNEL_COUNT: u8 = 3;
+
+        // Explicitly set case (for reference).
+        {
+            write_command_message(
+                sock.get_mut(),
+                0,
+                &Command::CreatePlaybackStream(PlaybackStreamParams {
+                    sample_spec: SampleSpec {
+                        format: SampleFormat::S16Le,
+                        channels: CHANNEL_COUNT,
+                        ..Default::default()
+                    },
+                    sync_id: 0,
+                    channel_map: ChannelMap::new([ChannelPosition::Mono; CHANNEL_COUNT as usize]),
+                    cvolume: Some(ChannelVolume::norm(CHANNEL_COUNT)),
+                    ..Default::default()
+                }),
+                protocol_version,
+            )?;
+
+            let _ = read_reply_message::<CreatePlaybackStreamReply>(&mut sock, protocol_version)?;
+        }
+
+        // Implicitly set case (on fields that allow it).
+        {
+            write_command_message(
+                sock.get_mut(),
+                1,
+                &Command::CreatePlaybackStream(PlaybackStreamParams {
+                    sample_spec: SampleSpec {
+                        format: SampleFormat::S16Le,
+                        channels: CHANNEL_COUNT,
+                        ..Default::default()
+                    },
+                    sync_id: 1,
+
+                    channel_map: ChannelMap::new([ChannelPosition::Mono; CHANNEL_COUNT as usize]),
+                    cvolume: None,
+                    ..Default::default()
+                }),
+                protocol_version,
+            )?;
+
+            let _ = read_reply_message::<CreatePlaybackStreamReply>(&mut sock, protocol_version)?;
+        }
 
         Ok(())
     }

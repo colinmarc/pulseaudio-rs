@@ -105,6 +105,16 @@ impl Default for ChannelMap {
 // FIXME are empty channel maps accepted by PA?
 
 impl ChannelMap {
+    /// Creates a channel map with the given channels.
+    pub fn new(channels: impl IntoIterator<Item = ChannelPosition>) -> Self {
+        let mut map = Self::empty();
+        for channel in channels {
+            map.push(channel);
+        }
+
+        map
+    }
+
     /// Creates an empty channel map.
     pub fn empty() -> Self {
         ChannelMap {
