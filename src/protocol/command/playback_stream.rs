@@ -144,7 +144,10 @@ impl TagStructWrite for PlaybackStreamParams {
         ts.write_u32(self.buffer_attr.pre_buffering)?;
         ts.write_u32(self.buffer_attr.minimum_request_length)?;
         ts.write_u32(self.sync_id)?;
-        ts.write(self.cvolume.unwrap_or_default())?;
+        ts.write(
+            self.cvolume
+                .unwrap_or_else(|| ChannelVolume::muted(self.sample_spec.channels.into())),
+        )?;
         ts.write_bool(self.flags.no_remap_channels)?;
         ts.write_bool(self.flags.no_remix_channels)?;
         ts.write_bool(self.flags.fix_format)?;

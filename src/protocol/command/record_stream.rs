@@ -163,7 +163,10 @@ impl TagStructWrite for RecordStreamParams {
                 ts.write(format)?;
             }
 
-            ts.write(self.cvolume.unwrap_or_default())?;
+            ts.write(
+                self.cvolume
+                    .unwrap_or_else(|| ChannelVolume::muted(self.sample_spec.channels.into())),
+            )?;
             ts.write_bool(self.flags.start_muted.unwrap_or_default())?;
             ts.write_bool(self.cvolume.is_some())?;
             ts.write_bool(self.flags.start_muted.is_some())?;
