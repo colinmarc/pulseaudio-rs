@@ -409,14 +409,14 @@ impl Client {
 fn roundtrip_blocking<R: protocol::CommandReply>(
     socket: &mut BufReader<impl Read + Write>,
     cmd: protocol::Command,
-    seq: u32,
+    req_seq: u32,
     protocol_version: u16,
 ) -> Result<R> {
-    log::debug!("CLIENT [{seq}]: {cmd:?}");
-    protocol::write_command_message(socket.get_mut(), seq, &cmd, protocol_version)?;
+    log::debug!("CLIENT [{req_seq}]: {cmd:?}");
+    protocol::write_command_message(socket.get_mut(), req_seq, &cmd, protocol_version)?;
 
-    let (seq, reply) = protocol::read_reply_message(socket, protocol_version)?;
-    if seq != seq {
+    let (reply_seq, reply) = protocol::read_reply_message(socket, protocol_version)?;
+    if req_seq != reply_seq {
         return Err(ClientError::UnexpectedSequenceNumber);
     }
 
