@@ -58,6 +58,7 @@ pub trait PlaybackSource: Send + 'static {
 /// A trait for converting a callback into an [AudioSource].
 pub trait AsPlaybackSource {
     /// Converts the callback into an [AudioSource].
+    #[allow(clippy::wrong_self_convention)]
     fn as_playback_source(self) -> impl PlaybackSource;
 }
 
@@ -101,9 +102,6 @@ where
         cx: &mut futures::task::Context<'_>,
         buf: &mut [u8],
     ) -> futures::task::Poll<usize> {
-        futures::AsyncRead::poll_read(self, cx, buf).map(|result| match result {
-            Ok(n) => n,
-            Err(_) => 0,
-        })
+        futures::AsyncRead::poll_read(self, cx, buf).map(|result| result.unwrap_or_default())
     }
 }

@@ -16,7 +16,7 @@ use pulseaudio::protocol::{self as pulse, SourceOutputInfoList, DESCRIPTOR_SIZE}
 /// direction are dumped to stdout.
 ///
 /// To use it, first launch the program, binding some socket:
-///     
+///
 ///     $ patrace --bind /tmp/patrace.sock
 ///
 /// Then, for example, list sinks with `pactl`:
@@ -107,7 +107,7 @@ fn main() -> anyhow::Result<()> {
                     )?;
 
                     let conn = Connection {
-                        client_name: format!("{:?}", addr),
+                        client_name: format!("{addr:?}"),
                         negotiated_version: pulse::MAX_VERSION,
                         client: stream,
                         client_token: token,
@@ -237,7 +237,7 @@ fn proxy(conn: &mut Connection, direction: Direction) -> anyhow::Result<()> {
                                     Box::new(reply)
                                 }
                                 Some(tag) => read_reply(&mut cursor, tag, conn.negotiated_version)
-                                    .context(format!("reading reply to [{}] {:?}", seq, tag))?,
+                                    .context(format!("reading reply to [{seq}] {tag:?}"))?,
                                 None => Box::new(UnknownReply(msg_bytes.len())),
                             };
 

@@ -190,17 +190,18 @@ impl TagStructRead for ChannelMap {
         let channels = ts.inner.read_u8()?;
         if channels > MAX_CHANNELS {
             return Err(ProtocolError::Invalid(format!(
-                "channel map too large (max is {} channels, got {})",
-                MAX_CHANNELS, channels
+                "channel map too large (max is {MAX_CHANNELS} channels, got {channels})"
             )));
         }
 
         let mut map = ChannelMap::empty();
         for _ in 0..channels {
             let raw = ts.inner.read_u8()?;
-            map.push(ChannelPosition::from_u8(raw).ok_or_else(|| {
-                ProtocolError::Invalid(format!("invalid channel position {}", raw))
-            })?)
+            map.push(
+                ChannelPosition::from_u8(raw).ok_or_else(|| {
+                    ProtocolError::Invalid(format!("invalid channel position {raw}"))
+                })?,
+            )
         }
 
         Ok(map)

@@ -149,7 +149,7 @@ impl Drop for RecordBufferSink {
 
 impl RecordSink for RecordBufferSink {
     fn write(&mut self, data: &[u8]) {
-        if data.len() == 0 {
+        if data.is_empty() {
             return;
         }
 

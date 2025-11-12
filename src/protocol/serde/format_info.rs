@@ -56,8 +56,7 @@ impl TagStructRead for FormatInfo {
 
         let encoding = ts.read_u8()?;
         let encoding = FormatEncoding::from_u8(encoding).ok_or(ProtocolError::Invalid(format!(
-            "invalid format encoding: 0x{:2x}",
-            encoding
+            "invalid format encoding: 0x{encoding:2x}"
         )))?;
         let props = ts.read()?;
         Ok(Self { encoding, props })

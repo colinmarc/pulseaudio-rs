@@ -194,8 +194,7 @@ impl TagStructRead for ChannelVolume {
         let n_channels = ts.inner.read_u8()?;
         if n_channels == 0 || n_channels > MAX_CHANNELS {
             return Err(ProtocolError::Invalid(format!(
-                "invalid cvolume channel count {}, must be between 1 and {}",
-                n_channels, MAX_CHANNELS
+                "invalid cvolume channel count {n_channels}, must be between 1 and {MAX_CHANNELS}"
             )));
         }
 

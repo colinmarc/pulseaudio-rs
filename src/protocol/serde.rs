@@ -67,7 +67,7 @@ impl<'a> TagStructReader<'a> {
     pub fn read_tag(&mut self) -> Result<Tag, ProtocolError> {
         let v = self.inner.read_u8()?;
         Tag::from_u8(v)
-            .ok_or_else(|| ProtocolError::Invalid(format!("invalid tag 0x{:02X} in tagstruct", v)))
+            .ok_or_else(|| ProtocolError::Invalid(format!("invalid tag 0x{v:02X} in tagstruct")))
     }
 
     /// Reads a tag from the stream, and returns an error if it's not equal
@@ -78,8 +78,7 @@ impl<'a> TagStructReader<'a> {
             Ok(())
         } else {
             Err(ProtocolError::Invalid(format!(
-                "expected {:?}, got {:?}",
-                next, t
+                "expected {next:?}, got {t:?}",
             )))
         }
     }
@@ -115,8 +114,7 @@ impl<'a> TagStructReader<'a> {
             Tag::BooleanTrue => Ok(true),
             Tag::BooleanFalse => Ok(false),
             _ => Err(ProtocolError::Invalid(format!(
-                "expected boolean, got {:?}",
-                tag
+                "expected boolean, got {tag:?}"
             ))),
         }
     }
@@ -168,13 +166,12 @@ impl<'a> TagStructReader<'a> {
                 let mut buf = Vec::new();
                 self.inner.read_until(0x00, &mut buf)?;
                 Ok(Some(CString::from_vec_with_nul(buf).map_err(|e| {
-                    ProtocolError::Invalid(format!("invalid string in tagstruct: {}", e))
+                    ProtocolError::Invalid(format!("invalid string in tagstruct: {e}"))
                 })?))
             }
             Tag::StringNull => Ok(None),
             tag => Err(ProtocolError::Invalid(format!(
-                "expected string or null string, got {:?}",
-                tag
+                "expected string or null string, got {tag:?}"
             ))),
         }
     }
@@ -186,7 +183,7 @@ impl<'a> TagStructReader<'a> {
         let mut buf = Vec::new();
         self.inner.read_until(0x00, &mut buf)?;
         CString::from_vec_with_nul(buf)
-            .map_err(|e| ProtocolError::Invalid(format!("invalid string in tagstruct: {}", e)))
+            .map_err(|e| ProtocolError::Invalid(format!("invalid string in tagstruct: {e}")))
     }
 
     /// Reads a u32, and checks it against PA_INVALID_INDEX (-1).

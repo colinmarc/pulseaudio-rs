@@ -109,10 +109,10 @@ impl TagStructRead for SubscriptionEvent {
 
         let event_facility =
             SubscriptionEventFacility::from_u32(event_facility).ok_or_else(|| {
-                ProtocolError::Invalid(format!("invalid event facility: {:#b}", event_facility))
+                ProtocolError::Invalid(format!("invalid event facility: {event_facility:#b}"))
             })?;
         let event_type = SubscriptionEventType::from_u32(event_type).ok_or_else(|| {
-            ProtocolError::Invalid(format!("invalid event type: {:#b}", event_type))
+            ProtocolError::Invalid(format!("invalid event type: {event_type:#b}"))
         })?;
         let index = ts.read_index()?;
 

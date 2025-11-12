@@ -282,8 +282,7 @@ pub fn read_ack_message(r: &mut impl BufRead) -> Result<u32, ProtocolError> {
         }
         CommandTag::Reply => Ok(seq),
         _ => Err(ProtocolError::Invalid(format!(
-            "expected reply, got {:?}",
-            cmd
+            "expected reply, got {cmd:?}"
         ))),
     }
 }

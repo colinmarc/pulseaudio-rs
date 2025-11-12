@@ -454,8 +454,7 @@ impl TagStructRead for Props {
             let len = ts.read_u32()?;
             if len > MAX_PROP_SIZE {
                 return Err(ProtocolError::Invalid(format!(
-                    "proplist value size {} exceeds hard limit of {} bytes",
-                    len, MAX_PROP_SIZE
+                    "proplist value size {len} exceeds hard limit of {MAX_PROP_SIZE} bytes"
                 )));
             }
 

@@ -130,7 +130,7 @@ impl TagStructRead for SampleSpec {
         ts.expect_tag(Tag::SampleSpec)?;
         let format = ts.inner.read_u8()?;
         let format = SampleFormat::from_u8(format)
-            .ok_or_else(|| ProtocolError::Invalid(format!("invalid sample format {}", format)))?;
+            .ok_or_else(|| ProtocolError::Invalid(format!("invalid sample format {format}")))?;
         let channels = ts.inner.read_u8()?;
         let sample_rate = ts.inner.read_u32::<NetworkEndian>()?;
 

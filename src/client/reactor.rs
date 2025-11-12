@@ -306,7 +306,7 @@ impl Reactor {
         let reactor_thread = std::thread::spawn(move || match reactor.run() {
             Ok(_) => Ok(()),
             Err(err) => {
-                log::error!("Reactor error: {}", err);
+                log::error!("Reactor error: {err}");
                 Err(err)
             }
         });
@@ -403,7 +403,7 @@ impl Reactor {
             match protocol::Command::read_tag_prefixed(&mut cursor, self.protocol_version) {
                 Ok((seq, cmd)) => (seq, cmd),
                 Err(err) => {
-                    log::error!("failed to read command message: {}", err);
+                    log::error!("failed to read command message: {err}");
                     return;
                 }
             };
@@ -413,7 +413,7 @@ impl Reactor {
         log::debug!("SERVER [{}]: {cmd:?}", seq as i32);
         if matches!(cmd, protocol::Command::Reply | protocol::Command::Error(_)) {
             let Some(handler) = state.handlers.remove(&seq) else {
-                log::warn!("no reply handler found for sequence {}", seq);
+                log::warn!("no reply handler found for sequence {seq}");
                 return;
             };
 
@@ -428,19 +428,19 @@ impl Reactor {
         match cmd {
             protocol::Command::Started(channel) => {
                 if state.playback_streams.contains_key(&channel) {
-                    log::debug!("stream started: {}", channel);
+                    log::debug!("stream started: {channel}");
                 } else {
-                    log::error!("unknown stream: {}", channel);
+                    log::error!("unknown stream: {channel}");
                 }
             }
             protocol::Command::Request(protocol::Request { channel, length }) => {
                 if let Some(stream) = state.playback_streams.get_mut(&channel) {
                     stream.requested_bytes += length as usize;
                 } else {
-                    log::error!("unknown stream: {}", channel);
+                    log::error!("unknown stream: {channel}");
                 }
             }
-            _ => log::debug!("ignoring unexpected command: {:?}", cmd),
+            _ => log::debug!("ignoring unexpected command: {cmd:?}"),
         }
     }
 
@@ -487,9 +487,8 @@ impl Reactor {
 
                 let waker = futures::task::waker(self.waker.clone());
                 let mut cx = Context::from_waker(&waker);
-                let mut buf = &mut self.write_buf[protocol::DESCRIPTOR_SIZE..];
-                let len = match PlaybackSource::poll_read(stream.source.as_mut(), &mut cx, &mut buf)
-                {
+                let buf = &mut self.write_buf[protocol::DESCRIPTOR_SIZE..];
+                let len = match PlaybackSource::poll_read(stream.source.as_mut(), &mut cx, buf) {
                     Poll::Ready(0) => {
                         log::debug!(
                             "source for stream {} reached EOF",
@@ -554,7 +553,7 @@ impl Reactor {
 
 fn drain_buf(buf: &mut Vec<u8>, w: &mut impl io::Write) -> Result<bool, io::Error> {
     while !buf.is_empty() {
-        match w.write(&buf) {
+        match w.write(buf) {
             Ok(0) => return Ok(false),
             Ok(n) => buf.drain(..n),
             Err(err) if err.kind() == io::ErrorKind::WouldBlock => return Ok(false),
