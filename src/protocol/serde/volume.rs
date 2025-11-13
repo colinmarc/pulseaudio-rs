@@ -136,17 +136,17 @@ impl ChannelVolume {
     }
 
     /// Create a `ChannelVolume` with N channels, all muted.
-    pub fn muted(channels: usize) -> ChannelVolume {
+    pub fn muted(channels: u8) -> ChannelVolume {
         Self {
-            channels: channels as u8,
+            channels,
             volumes: [Volume::MUTED; MAX_CHANNELS as usize],
         }
     }
 
     /// Create a `ChannelVolume` with N channels, all at full volume.
-    pub fn norm(channels: usize) -> ChannelVolume {
+    pub fn norm(channels: u8) -> ChannelVolume {
         Self {
-            channels: channels as u8,
+            channels,
             volumes: [Volume::NORM; MAX_CHANNELS as usize],
         }
     }
