@@ -129,6 +129,21 @@ impl ChannelMap {
         map
     }
 
+    /// Creates a channel map with N (arbitrarily chosen) channels.
+    ///
+    /// Intended for testing cases where only the number of channels matters.
+    #[cfg(test)]
+    #[cfg(feature = "_integration-tests")]
+    pub(crate) fn with_n_channels(channels: u8) -> Self {
+        let mut map = ChannelMap::empty();
+        for pos in
+            (1..=channels).map(|idx| ChannelPosition::from_u8(idx).expect("known channel index"))
+        {
+            map.push(pos);
+        }
+        map
+    }
+
     /// Tries to append another `ChannelPosition` to the end of this map.
     ///
     /// Panics if the map already has MAX_CHANNELS channels.
