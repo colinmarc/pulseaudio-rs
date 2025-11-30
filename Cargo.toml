@@ -3,7 +3,7 @@ name = "pulseaudio"
 description = "A native rust implementation of the PulseAudio protocol."
 repository = "https://github.com/colinmarc/pulseaudio-rs"
 edition = "2024"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Colin Marc <hi@colinmarc.com>"]
 license = "MIT"
 
