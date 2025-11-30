@@ -3,9 +3,9 @@ use std::{
     io::{self},
     pin::Pin,
     sync::{
+        Arc, Mutex, Weak,
         atomic::{self, AtomicU32},
         mpsc::{Receiver, Sender, TryRecvError},
-        Arc, Mutex, Weak,
     },
     task::{Context, Poll},
     thread::JoinHandle,
@@ -169,10 +169,10 @@ impl ReactorHandle {
     }
 
     pub(super) fn mark_playback_stream_draining(&self, channel: u32) {
-        if let Some(state) = self.state.upgrade() {
-            if let Some(stream) = state.lock().unwrap().playback_streams.get_mut(&channel) {
-                stream.done = true;
-            }
+        if let Some(state) = self.state.upgrade()
+            && let Some(stream) = state.lock().unwrap().playback_streams.get_mut(&channel)
+        {
+            stream.done = true;
         }
     }
 

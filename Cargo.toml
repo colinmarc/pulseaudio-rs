@@ -2,12 +2,9 @@
 name = "pulseaudio"
 description = "A native rust implementation of the PulseAudio protocol."
 repository = "https://github.com/colinmarc/pulseaudio-rs"
-edition = "2021"
+edition = "2024"
 version = "0.3.0"
-authors = [
-    "Colin Marc <hi@colinmarc.com>",
-    "Jonas Schievink <jonasschievink@gmail.com>",
-]
+authors = ["Colin Marc <hi@colinmarc.com>"]
 license = "MIT"
 
 [workspace]
