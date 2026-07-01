@@ -1,6 +1,6 @@
 use crate::protocol::serde::stream::{BufferAttr, StreamFlags};
-use crate::protocol::{serde::*, ProtocolError};
 use crate::protocol::{ChannelMap, ChannelVolume, Props, SampleSpec};
+use crate::protocol::{ProtocolError, serde::*};
 
 use std::ffi::CString;
 
@@ -101,25 +101,25 @@ impl TagStructRead for PlaybackStreamParams {
                 params.cvolume = None;
             }
 
-            flags.early_requests = ts.read_bool()?;
+            params.flags.early_requests = ts.read_bool()?;
         }
 
         if protocol_version >= 15 {
             // Sent by the client if (flags & START_MUTED | START_UNMUTED).
             if !ts.read_bool()? {
-                flags.start_muted = None
+                params.flags.start_muted = None
             }
 
-            flags.no_inhibit_auto_suspend = ts.read_bool()?;
-            flags.fail_on_suspend = ts.read_bool()?;
+            params.flags.no_inhibit_auto_suspend = ts.read_bool()?;
+            params.flags.fail_on_suspend = ts.read_bool()?;
         }
 
         if protocol_version >= 17 {
-            flags.relative_volume = ts.read_bool()?;
+            params.flags.relative_volume = ts.read_bool()?;
         }
 
         if protocol_version >= 18 {
-            flags.passthrough = ts.read_bool()?;
+            params.flags.passthrough = ts.read_bool()?;
         }
 
         if protocol_version >= 21 {
@@ -298,7 +298,8 @@ impl TagStructWrite for CreatePlaybackStreamReply {
 
 #[cfg(test)]
 mod tests {
-    use crate::protocol::test_util::test_serde;
+    use crate::protocol::MAX_VERSION;
+    use crate::protocol::test_util::{test_serde, test_serde_version};
 
     use super::*;
 
@@ -315,12 +316,17 @@ mod tests {
             flags: StreamFlags {
                 start_corked: true,
                 start_muted: Some(true),
+                early_requests: true,
+                no_inhibit_auto_suspend: true,
+                fail_on_suspend: true,
+                relative_volume: true,
+                passthrough: true,
                 ..Default::default()
             },
             ..Default::default()
         };
 
-        test_serde(&params)
+        test_serde_version(&params, MAX_VERSION)
     }
 
     #[test]
