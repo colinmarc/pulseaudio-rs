@@ -4,7 +4,7 @@ use std::{
     pin::Pin,
     sync::{
         Arc, Mutex, Weak,
-        atomic::{self, AtomicU32},
+        atomic::{self, AtomicBool, AtomicU32, AtomicU64},
         mpsc::{Receiver, Sender, TryRecvError},
     },
     task::{Context, Poll},
@@ -16,7 +16,7 @@ use mio::net::UnixStream;
 
 use crate::protocol::{self, DescriptorFlags};
 
-use super::{ClientError, PlaybackSource, RecordSink};
+use super::{ClientError, PlaybackSource, RecordSink, StreamStatus, SubscriptionSink};
 
 type ReplyResult<'a> =
     Result<(&'a mut ReactorState, &'a mut dyn io::BufRead), protocol::PulseError>;
@@ -29,11 +29,52 @@ struct PlaybackStreamState {
     requested_bytes: usize,
     done: bool,
     eof_notify: Option<oneshot::Sender<()>>,
+    events: Arc<StreamEventCounters>,
 }
 
 pub(super) struct RecordStreamState {
+    stream_index: u32,
     sink: Box<dyn RecordSink>,
     start_notify: Option<oneshot::Sender<()>>,
+    events: Arc<StreamEventCounters>,
+}
+
+/// Tracks post-creation server events for a playback or record stream. Shared between the
+/// reactor, which updates it as events arrive, and the client-facing stream handle, which
+/// reads snapshots of it.
+#[derive(Default)]
+pub(super) struct StreamEventCounters {
+    xruns: AtomicU64,
+    suspended: AtomicBool,
+    moves: AtomicU64,
+    killed: AtomicBool,
+}
+
+impl StreamEventCounters {
+    pub(super) fn snapshot(&self) -> StreamStatus {
+        StreamStatus {
+            xruns: self.xruns.load(atomic::Ordering::Relaxed),
+            suspended: self.suspended.load(atomic::Ordering::Relaxed),
+            moves: self.moves.load(atomic::Ordering::Relaxed),
+            killed: self.killed.load(atomic::Ordering::Relaxed),
+        }
+    }
+
+    fn record_xrun(&self) {
+        self.xruns.fetch_add(1, atomic::Ordering::Relaxed);
+    }
+
+    fn set_suspended(&self, suspended: bool) {
+        self.suspended.store(suspended, atomic::Ordering::Relaxed);
+    }
+
+    fn record_move(&self) {
+        self.moves.fetch_add(1, atomic::Ordering::Relaxed);
+    }
+
+    fn set_killed(&self) {
+        self.killed.store(true, atomic::Ordering::Relaxed);
+    }
 }
 
 #[derive(Default)]
@@ -41,6 +82,7 @@ struct ReactorState {
     handlers: BTreeMap<u32, ReplyHandler>,
     playback_streams: BTreeMap<u32, PlaybackStreamState>,
     record_streams: BTreeMap<u32, RecordStreamState>,
+    subscription: Option<Box<dyn SubscriptionSink>>,
 }
 
 struct SharedState {
@@ -114,6 +156,7 @@ impl ReactorHandle {
         params: protocol::PlaybackStreamParams,
         source: impl PlaybackSource,
         eof_notify: Option<oneshot::Sender<()>>,
+        events: Arc<StreamEventCounters>,
     ) -> Result<protocol::CreatePlaybackStreamReply, ClientError> {
         // This is the seq for the CreatePlaybackStream command.
         let seq = self.next_seq();
@@ -134,6 +177,7 @@ impl ReactorHandle {
                     requested_bytes,
                     done: false,
                     eof_notify,
+                    events,
                 },
             );
 
@@ -181,6 +225,7 @@ impl ReactorHandle {
         params: protocol::RecordStreamParams,
         sink: impl RecordSink,
         start_notify: Option<oneshot::Sender<()>>,
+        events: Arc<StreamEventCounters>,
     ) -> Result<protocol::CreateRecordStreamReply, ClientError> {
         let seq = self.next_seq();
 
@@ -193,8 +238,10 @@ impl ReactorHandle {
             state.record_streams.insert(
                 stream_info.channel,
                 RecordStreamState {
+                    stream_index: stream_info.stream_index,
                     sink: Box::new(sink),
                     start_notify,
+                    events,
                 },
             );
 
@@ -227,6 +274,37 @@ impl ReactorHandle {
 
         self.write_command(seq, protocol::Command::DeleteRecordStream(channel))?;
         rx.await.map_err(|_| ClientError::Disconnected)
+    }
+
+    pub(super) async fn insert_subscription(
+        &self,
+        mask: protocol::SubscriptionMask,
+        sink: impl SubscriptionSink,
+    ) -> Result<(), ClientError> {
+        let seq = self.next_seq();
+
+        let (tx, rx) = oneshot::channel();
+        self.install_handler(seq, move |res: ReplyResult<'_>| {
+            let _ = match res {
+                Ok(_) => tx.send(Ok(())),
+                Err(err) => tx.send(Err(ClientError::ServerError(err))),
+            };
+        })?;
+
+        self.write_command(seq, protocol::Command::Subscribe(mask))?;
+        rx.await.map_err(|_| ClientError::Disconnected)??;
+
+        if let Some(state) = self.state.upgrade() {
+            state.lock().unwrap().subscription = Some(Box::new(sink));
+        }
+
+        Ok(())
+    }
+
+    pub(super) fn clear_subscription(&self) {
+        if let Some(state) = self.state.upgrade() {
+            state.lock().unwrap().subscription = None;
+        }
     }
 
     fn write_command(&self, seq: u32, cmd: protocol::Command) -> Result<(), ClientError> {
@@ -378,8 +456,9 @@ impl Reactor {
                 } else {
                     // Stream data for a record stream.
                     let mut guard = self.state.lock().unwrap();
-                    if let Some(RecordStreamState { sink, start_notify }) =
-                        guard.record_streams.get_mut(&desc.channel)
+                    if let Some(RecordStreamState {
+                        sink, start_notify, ..
+                    }) = guard.record_streams.get_mut(&desc.channel)
                     {
                         log::trace!("reading {len} bytes from stream {}", desc.channel,);
                         if let Some(start_notify) = start_notify.take() {
@@ -438,6 +517,86 @@ impl Reactor {
                     stream.requested_bytes += length as usize;
                 } else {
                     log::error!("unknown stream: {channel}");
+                }
+            }
+            protocol::Command::Underflow(protocol::Underflow { channel, .. }) => {
+                if let Some(stream) = state.playback_streams.get(&channel) {
+                    stream.events.record_xrun();
+                } else {
+                    log::warn!("underflow for unknown stream: {channel}");
+                }
+            }
+            protocol::Command::Overflow(channel) => {
+                if let Some(stream) = state.record_streams.get(&channel) {
+                    stream.events.record_xrun();
+                } else {
+                    log::warn!("overflow for unknown stream: {channel}");
+                }
+            }
+            protocol::Command::PlaybackStreamSuspended(protocol::StreamSuspendedParams {
+                stream_index,
+                suspended,
+            }) => {
+                if let Some(stream) = state
+                    .playback_streams
+                    .values()
+                    .find(|s| s.stream_info.stream_index == stream_index)
+                {
+                    stream.events.set_suspended(suspended);
+                }
+            }
+            protocol::Command::RecordStreamSuspended(protocol::StreamSuspendedParams {
+                stream_index,
+                suspended,
+            }) => {
+                if let Some(stream) = state
+                    .record_streams
+                    .values()
+                    .find(|s| s.stream_index == stream_index)
+                {
+                    stream.events.set_suspended(suspended);
+                }
+            }
+            protocol::Command::PlaybackStreamMoved(protocol::PlaybackStreamMovedParams {
+                stream_index,
+                ..
+            }) => {
+                if let Some(stream) = state
+                    .playback_streams
+                    .values()
+                    .find(|s| s.stream_info.stream_index == stream_index)
+                {
+                    stream.events.record_move();
+                }
+            }
+            protocol::Command::RecordStreamMoved(protocol::RecordStreamMovedParams {
+                stream_index,
+                ..
+            }) => {
+                if let Some(stream) = state
+                    .record_streams
+                    .values()
+                    .find(|s| s.stream_index == stream_index)
+                {
+                    stream.events.record_move();
+                }
+            }
+            // The server discarded the stream outright (e.g. its device was removed with no
+            // fallback to move it to). Drop our side too, so the reactor stops polling the
+            // source/sink for a channel the server no longer recognizes.
+            protocol::Command::PlaybackStreamKilled(channel) => {
+                if let Some(stream) = state.playback_streams.remove(&channel) {
+                    stream.events.set_killed();
+                }
+            }
+            protocol::Command::RecordStreamKilled(channel) => {
+                if let Some(stream) = state.record_streams.remove(&channel) {
+                    stream.events.set_killed();
+                }
+            }
+            protocol::Command::SubscribeEvent(event) => {
+                if let Some(sink) = &mut state.subscription {
+                    sink.event(event);
                 }
             }
             _ => log::debug!("ignoring unexpected command: {cmd:?}"),

@@ -1,8 +1,11 @@
 use std::{ffi::CString, sync::Arc, time};
 
-use futures::{channel::oneshot, FutureExt as _};
+use futures::{FutureExt as _, channel::oneshot};
 
-use super::{reactor::ReactorHandle, ClientError, RecordSink, Result as ClientResult};
+use super::{
+    ClientError, RecordSink, Result as ClientResult, StreamStatus,
+    reactor::{ReactorHandle, StreamEventCounters},
+};
 use crate::protocol;
 
 /// A stream of audio data sent from the server to the client, originating from
@@ -16,6 +19,7 @@ struct InnerRecordStream {
     handle: ReactorHandle,
     info: protocol::CreateRecordStreamReply,
     start_notify: futures::future::Shared<oneshot::Receiver<()>>,
+    events: Arc<StreamEventCounters>,
 }
 
 impl std::fmt::Debug for RecordStream {
@@ -33,20 +37,36 @@ impl RecordStream {
         sink: impl RecordSink,
     ) -> Result<Self, ClientError> {
         let (start_tx, start_rx) = oneshot::channel();
+        let events = Arc::new(StreamEventCounters::default());
         let info = handle
-            .insert_record_stream(params, sink, Some(start_tx))
+            .insert_record_stream(params, sink, Some(start_tx), events.clone())
             .await?;
 
         Ok(Self(Arc::new(InnerRecordStream {
             handle,
             info,
             start_notify: start_rx.shared(),
+            events,
         })))
     }
 
     /// The ID of the stream.
     pub fn channel(&self) -> u32 {
         self.0.info.channel
+    }
+
+    /// The server-internal index of the stream (i.e. the source output), suitable for
+    /// use with management commands that take a source output index, such as
+    /// [Client::move_source_output](super::Client::move_source_output).
+    pub fn stream_index(&self) -> u32 {
+        self.0.info.stream_index
+    }
+
+    /// Returns a snapshot of post-creation server events for the stream: buffer
+    /// overflows, suspensions, moves to a different source, or the server killing the
+    /// stream outright. See [StreamStatus].
+    pub fn status(&self) -> StreamStatus {
+        self.0.events.snapshot()
     }
 
     /// The attributes of the server-side buffer.

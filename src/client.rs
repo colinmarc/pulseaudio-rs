@@ -12,11 +12,13 @@ mod playback_stream;
 mod reactor;
 mod record_sink;
 mod record_stream;
+mod subscription;
 
 pub use playback_source::*;
 pub use playback_stream::*;
 pub use record_sink::*;
 pub use record_stream::*;
+pub use subscription::*;
 
 /// An error encountered by a [Client].
 #[derive(Debug, thiserror::Error)]
@@ -44,6 +46,30 @@ pub enum ClientError {
 
 /// The result of a [Client] operation.
 pub type Result<T> = std::result::Result<T, ClientError>;
+
+/// A snapshot of post-creation server events for a [PlaybackStream] or [RecordStream], as
+/// observed at the time of the call. See [PlaybackStream::status] and
+/// [RecordStream::status].
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct StreamStatus {
+    /// The number of buffer underflows (for playback streams) or buffer overflows (for
+    /// record streams) the server has reported since the stream was created. Either
+    /// indicates an audio glitch likely occurred.
+    pub xruns: u64,
+
+    /// Whether the underlying sink or source is currently suspended, for example because
+    /// the hardware idled itself or was physically unplugged.
+    pub suspended: bool,
+
+    /// The number of times the server has moved the stream to a different sink or source,
+    /// for example because the original device was removed and a fallback was used.
+    pub moves: u64,
+
+    /// Whether the server has killed the stream outright, for example because the
+    /// underlying device was removed with no fallback to move to. No further data will be
+    /// exchanged once this is set.
+    pub killed: bool,
+}
 
 /// A PulseAudio client.
 ///
@@ -385,6 +411,85 @@ impl Client {
             .await
     }
 
+    /// Moves a sink input (the server-side representation of a playback stream),
+    /// identified by `index`, to a different sink, by the destination sink's index. See
+    /// [PlaybackStream::stream_index].
+    pub async fn move_sink_input(&self, index: u32, sink_index: u32) -> Result<()> {
+        self.handle
+            .roundtrip_ack(protocol::Command::MoveSinkInput(
+                protocol::MoveStreamParams {
+                    index: Some(index),
+                    device_index: Some(sink_index),
+                    device_name: None,
+                },
+            ))
+            .await
+    }
+
+    /// Moves a sink input (the server-side representation of a playback stream),
+    /// identified by `index`, to a different sink, by the destination sink's name. See
+    /// [PlaybackStream::stream_index].
+    pub async fn move_sink_input_by_name(&self, index: u32, sink_name: CString) -> Result<()> {
+        self.handle
+            .roundtrip_ack(protocol::Command::MoveSinkInput(
+                protocol::MoveStreamParams {
+                    index: Some(index),
+                    device_index: None,
+                    device_name: Some(sink_name),
+                },
+            ))
+            .await
+    }
+
+    /// Moves a source output (the server-side representation of a record stream),
+    /// identified by `index`, to a different source, by the destination source's index.
+    /// See [RecordStream::stream_index].
+    pub async fn move_source_output(&self, index: u32, source_index: u32) -> Result<()> {
+        self.handle
+            .roundtrip_ack(protocol::Command::MoveSourceOutput(
+                protocol::MoveStreamParams {
+                    index: Some(index),
+                    device_index: Some(source_index),
+                    device_name: None,
+                },
+            ))
+            .await
+    }
+
+    /// Moves a source output (the server-side representation of a record stream),
+    /// identified by `index`, to a different source, by the destination source's name.
+    /// See [RecordStream::stream_index].
+    pub async fn move_source_output_by_name(&self, index: u32, source_name: CString) -> Result<()> {
+        self.handle
+            .roundtrip_ack(protocol::Command::MoveSourceOutput(
+                protocol::MoveStreamParams {
+                    index: Some(index),
+                    device_index: None,
+                    device_name: Some(source_name),
+                },
+            ))
+            .await
+    }
+
+    /// Subscribes to server-side events matching `mask`. The given sink is called for
+    /// each matching event until the returned [Subscription] is dropped.
+    ///
+    /// For example, to detect changes to the default sink or source, subscribe with
+    /// [`SubscriptionMask::SERVER`](protocol::SubscriptionMask::SERVER) and call
+    /// [server_info](Client::server_info) again on each event to read the new
+    /// `default_sink_name`/`default_source_name`.
+    ///
+    /// PulseAudio keeps a single subscription mask per connection: creating a new
+    /// subscription replaces the mask and sink of any previous, still-live
+    /// [Subscription] on this client.
+    pub async fn subscribe(
+        &self,
+        mask: protocol::SubscriptionMask,
+        sink: impl SubscriptionSink,
+    ) -> Result<Subscription> {
+        Subscription::new(self.handle.clone(), mask, sink).await
+    }
+
     /// Creates a new playback stream. The given callback will be called when the
     /// server requests data for the stream.
     pub async fn create_playback_stream(
@@ -427,8 +532,8 @@ mod tests {
     use std::time;
 
     use super::*;
-    use anyhow::anyhow;
     use anyhow::Context as _;
+    use anyhow::anyhow;
     use futures::executor::block_on;
     use rand::Rng;
 
@@ -773,10 +878,12 @@ mod tests {
         }
 
         let client_list = block_on(client2.list_clients())?;
-        assert!(client_list
-            .iter()
-            .find(|client| client.name == client1_info.name)
-            .is_none());
+        assert!(
+            client_list
+                .iter()
+                .find(|client| client.name == client1_info.name)
+                .is_none()
+        );
 
         Ok(())
     }

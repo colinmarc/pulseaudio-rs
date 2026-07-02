@@ -2,11 +2,11 @@ use std::ffi::CString;
 use std::sync::Arc;
 use std::time;
 
-use futures::channel::oneshot;
 use futures::FutureExt as _;
+use futures::channel::oneshot;
 
-use super::reactor::ReactorHandle;
-use super::{ClientError, PlaybackSource, Result as ClientResult};
+use super::reactor::{ReactorHandle, StreamEventCounters};
+use super::{ClientError, PlaybackSource, Result as ClientResult, StreamStatus};
 use crate::protocol;
 
 /// A stream of audio data sent from the client to the server for playback in
@@ -20,6 +20,7 @@ struct InnerPlaybackStream {
     handle: ReactorHandle,
     info: protocol::CreatePlaybackStreamReply,
     eof_notify: futures::future::Shared<oneshot::Receiver<()>>,
+    events: Arc<StreamEventCounters>,
 }
 
 impl std::fmt::Debug for PlaybackStream {
@@ -37,20 +38,36 @@ impl PlaybackStream {
         source: impl PlaybackSource,
     ) -> Result<Self, ClientError> {
         let (eof_tx, eof_rx) = oneshot::channel();
+        let events = Arc::new(StreamEventCounters::default());
         let info = handle
-            .insert_playback_stream(params, source, Some(eof_tx))
+            .insert_playback_stream(params, source, Some(eof_tx), events.clone())
             .await?;
 
         Ok(Self(Arc::new(InnerPlaybackStream {
             handle,
             info,
             eof_notify: eof_rx.shared(),
+            events,
         })))
     }
 
     /// The ID of the stream.
     pub fn channel(&self) -> u32 {
         self.0.info.channel
+    }
+
+    /// The server-internal index of the stream (i.e. the sink input), suitable for use
+    /// with management commands that take a sink input index, such as
+    /// [Client::move_sink_input](super::Client::move_sink_input).
+    pub fn stream_index(&self) -> u32 {
+        self.0.info.stream_index
+    }
+
+    /// Returns a snapshot of post-creation server events for the stream: buffer
+    /// underflows, suspensions, moves to a different sink, or the server killing the
+    /// stream outright. See [StreamStatus].
+    pub fn status(&self) -> StreamStatus {
+        self.0.events.snapshot()
     }
 
     /// The attributes of the server-side buffer.
