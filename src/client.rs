@@ -424,6 +424,10 @@ fn roundtrip_blocking<R: protocol::CommandReply>(
 }
 #[cfg(all(test, feature = "_integration-tests"))]
 mod tests {
+    use std::pin::Pin;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex, mpsc};
+    use std::task::{Context, Poll, Waker};
     use std::time;
 
     use super::*;
@@ -438,6 +442,16 @@ mod tests {
             rand::rng().random_range(0..10000)
         ))
         .unwrap()
+    }
+
+    fn playback_stream_params() -> protocol::PlaybackStreamParams {
+        protocol::PlaybackStreamParams {
+            sample_spec: protocol::SampleSpec {
+                format: protocol::SampleFormat::S16Le,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
     }
 
     #[test_log::test]
@@ -777,6 +791,72 @@ mod tests {
             .iter()
             .find(|client| client.name == client1_info.name)
             .is_none());
+
+        Ok(())
+    }
+
+    /// A [PlaybackSource] that yields silence while open, and otherwise
+    /// stashes its waker and returns `Pending` -- unlike a plain callback,
+    /// this can pause without signaling EOF.
+    #[derive(Clone)]
+    struct Gate {
+        open: Arc<AtomicBool>,
+        waker: Arc<Mutex<Option<Waker>>>,
+        written: mpsc::Sender<()>,
+    }
+
+    impl Gate {
+        fn new(written: mpsc::Sender<()>) -> Self {
+            Self {
+                open: Arc::new(AtomicBool::new(false)),
+                waker: Arc::new(Mutex::new(None)),
+                written,
+            }
+        }
+
+        fn open(&self) {
+            self.open.store(true, Ordering::Relaxed);
+            if let Some(waker) = self.waker.lock().unwrap().take() {
+                waker.wake();
+            }
+        }
+    }
+
+    impl PlaybackSource for Gate {
+        fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<usize> {
+            if self.open.load(Ordering::Relaxed) {
+                buf.fill(0);
+                let _ = self.written.send(());
+                Poll::Ready(buf.len())
+            } else {
+                *self.waker.lock().unwrap() = Some(cx.waker().clone());
+                Poll::Pending
+            }
+        }
+    }
+
+    // Regression test for a bug where drain() would mark the stream as
+    // permanently done, so the reactor stopped polling the source for more
+    // data even though it hadn't reached EOF and the stream was still
+    // connected.
+    #[test_log::test]
+    fn drain_leaves_playback_stream_usable() -> anyhow::Result<()> {
+        let client =
+            Client::from_env(random_client_name()).context("connecting to PulseAudio server")?;
+
+        let (tx, rx) = mpsc::channel();
+        let gate = Gate::new(tx);
+
+        // The gate starts closed, so nothing is ever written and the
+        // buffer stays empty: drain() should complete right away.
+        let stream =
+            block_on(client.create_playback_stream(playback_stream_params(), gate.clone()))?;
+        block_on(stream.drain())?;
+
+        // Opening the gate after drain() should still feed the stream.
+        gate.open();
+        rx.recv_timeout(time::Duration::from_secs(1))
+            .context("stream never resumed after drain()")?;
 
         Ok(())
     }
