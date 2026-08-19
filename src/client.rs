@@ -573,6 +573,28 @@ mod tests {
         .as_playback_source()
     }
 
+    /// Reads events from `rx` until one matches `pred`, or `timeout` elapses without a
+    /// match.
+    fn recv_matching(
+        rx: &std::sync::mpsc::Receiver<protocol::SubscriptionEvent>,
+        timeout: time::Duration,
+        pred: impl Fn(&protocol::SubscriptionEvent) -> bool,
+    ) -> Option<protocol::SubscriptionEvent> {
+        let deadline = time::Instant::now() + timeout;
+        loop {
+            let remaining = deadline.saturating_duration_since(time::Instant::now());
+            if remaining.is_zero() {
+                return None;
+            }
+
+            match rx.recv_timeout(remaining) {
+                Ok(event) if pred(&event) => return Some(event),
+                Ok(_) => continue,
+                Err(_) => return None,
+            }
+        }
+    }
+
     #[test_log::test]
     fn server_info() -> anyhow::Result<()> {
         let client =
@@ -917,6 +939,42 @@ mod tests {
     }
 
     #[test_log::test]
+    fn playback_stream_status_starts_default() -> anyhow::Result<()> {
+        let client =
+            Client::from_env(random_client_name()).context("connecting to PulseAudio server")?;
+
+        let stream =
+            block_on(client.create_playback_stream(playback_stream_params(), silence_source()))?;
+        assert_eq!(stream.status(), StreamStatus::default());
+
+        Ok(())
+    }
+
+    #[test_log::test]
+    fn playback_stream_status_reflects_kill() -> anyhow::Result<()> {
+        let client =
+            Client::from_env(random_client_name()).context("connecting to PulseAudio server")?;
+
+        let stream =
+            block_on(client.create_playback_stream(playback_stream_params(), silence_source()))?;
+
+        block_on(client.kill_sink_input(stream.stream_index()))?;
+
+        let start = time::Instant::now();
+        loop {
+            if stream.status().killed {
+                break;
+            }
+            if start.elapsed() >= time::Duration::from_secs(1) {
+                panic!("stream was never marked killed");
+            }
+            std::thread::sleep(time::Duration::from_millis(10));
+        }
+
+        Ok(())
+    }
+
+    #[test_log::test]
     fn move_sink_input() -> anyhow::Result<()> {
         let client =
             Client::from_env(random_client_name()).context("connecting to PulseAudio server")?;
@@ -956,6 +1014,40 @@ mod tests {
             }
             if start.elapsed() >= time::Duration::from_secs(1) {
                 panic!("stream was never marked as moved a second time");
+            }
+            std::thread::sleep(time::Duration::from_millis(10));
+        }
+
+        Ok(())
+    }
+
+    #[test_log::test]
+    fn record_stream_status_starts_default() -> anyhow::Result<()> {
+        let client =
+            Client::from_env(random_client_name()).context("connecting to PulseAudio server")?;
+
+        let stream = block_on(client.create_record_stream(record_stream_params(), |_: &[u8]| {}))?;
+        assert_eq!(stream.status(), StreamStatus::default());
+
+        Ok(())
+    }
+
+    #[test_log::test]
+    fn record_stream_status_reflects_kill() -> anyhow::Result<()> {
+        let client =
+            Client::from_env(random_client_name()).context("connecting to PulseAudio server")?;
+
+        let stream = block_on(client.create_record_stream(record_stream_params(), |_: &[u8]| {}))?;
+
+        block_on(client.kill_source_output(stream.stream_index()))?;
+
+        let start = time::Instant::now();
+        loop {
+            if stream.status().killed {
+                break;
+            }
+            if start.elapsed() >= time::Duration::from_secs(1) {
+                panic!("stream was never marked killed");
             }
             std::thread::sleep(time::Duration::from_millis(10));
         }
@@ -1008,6 +1100,119 @@ mod tests {
             }
             std::thread::sleep(time::Duration::from_millis(10));
         }
+
+        Ok(())
+    }
+
+    #[test_log::test]
+    fn subscribe_receives_events() -> anyhow::Result<()> {
+        let client =
+            Client::from_env(random_client_name()).context("connecting to PulseAudio server")?;
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        let _sub = block_on(client.subscribe(
+            protocol::SubscriptionMask::SINK_INPUT,
+            move |event| {
+                let _ = tx.send(event);
+            },
+        ))?;
+
+        let stream =
+            block_on(client.create_playback_stream(playback_stream_params(), silence_source()))?;
+
+        let event = recv_matching(&rx, time::Duration::from_secs(1), |e| {
+            e.event_facility == protocol::SubscriptionEventFacility::SinkInput
+                && e.event_type == protocol::SubscriptionEventType::New
+                && e.index == Some(stream.stream_index())
+        });
+        assert!(
+            event.is_some(),
+            "did not receive a SinkInput/New event for our stream"
+        );
+
+        Ok(())
+    }
+
+    #[test_log::test]
+    fn subscribe_replaces_previous() -> anyhow::Result<()> {
+        let client =
+            Client::from_env(random_client_name()).context("connecting to PulseAudio server")?;
+
+        let (tx1, rx1) = std::sync::mpsc::channel();
+        let _sub1 = block_on(client.subscribe(
+            protocol::SubscriptionMask::SINK_INPUT,
+            move |event| {
+                let _ = tx1.send(event);
+            },
+        ))?;
+
+        let (tx2, rx2) = std::sync::mpsc::channel();
+        let _sub2 = block_on(client.subscribe(
+            protocol::SubscriptionMask::SINK_INPUT,
+            move |event| {
+                let _ = tx2.send(event);
+            },
+        ))?;
+
+        let stream =
+            block_on(client.create_playback_stream(playback_stream_params(), silence_source()))?;
+
+        let event = recv_matching(&rx2, time::Duration::from_secs(1), |e| {
+            e.index == Some(stream.stream_index())
+        });
+        assert!(
+            event.is_some(),
+            "replacement subscription never received our stream's event"
+        );
+
+        let event = recv_matching(&rx1, time::Duration::from_millis(200), |e| {
+            e.index == Some(stream.stream_index())
+        });
+        assert!(
+            event.is_none(),
+            "original subscription should no longer receive events once replaced"
+        );
+
+        Ok(())
+    }
+
+    #[test_log::test]
+    fn subscribe_drop_stops_events() -> anyhow::Result<()> {
+        let client =
+            Client::from_env(random_client_name()).context("connecting to PulseAudio server")?;
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        let sub = block_on(client.subscribe(
+            protocol::SubscriptionMask::SINK_INPUT,
+            move |event| {
+                let _ = tx.send(event);
+            },
+        ))?;
+
+        let stream1 =
+            block_on(client.create_playback_stream(playback_stream_params(), silence_source()))?;
+        let event = recv_matching(&rx, time::Duration::from_secs(1), |e| {
+            e.index == Some(stream1.stream_index())
+        });
+        assert!(
+            event.is_some(),
+            "did not receive event before dropping subscription"
+        );
+
+        drop(sub);
+
+        // Give the fire-and-forget unsubscribe issued by Drop time to reach the server.
+        std::thread::sleep(time::Duration::from_millis(300));
+
+        let stream2 =
+            block_on(client.create_playback_stream(playback_stream_params(), silence_source()))?;
+        let event = recv_matching(&rx, time::Duration::from_millis(300), |e| {
+            e.index == Some(stream2.stream_index())
+        });
+        assert!(
+            event.is_none(),
+            "sink should not receive events after the subscription is dropped"
+        );
 
         Ok(())
     }
