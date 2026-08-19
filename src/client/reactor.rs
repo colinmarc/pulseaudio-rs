@@ -33,7 +33,6 @@ struct PlaybackStreamState {
 }
 
 pub(super) struct RecordStreamState {
-    stream_index: u32,
     sink: Box<dyn RecordSink>,
     start_notify: Option<oneshot::Sender<()>>,
     events: Arc<StreamEventCounters>,
@@ -238,7 +237,6 @@ impl ReactorHandle {
             state.record_streams.insert(
                 stream_info.channel,
                 RecordStreamState {
-                    stream_index: stream_info.stream_index,
                     sink: Box::new(sink),
                     start_notify,
                     events,
@@ -533,51 +531,37 @@ impl Reactor {
                     log::warn!("overflow for unknown stream: {channel}");
                 }
             }
+            // Despite the field name, `stream_index` here is the connection-local channel
+            // (matching Underflow/Overflow/Killed above), not the server-wide stream index.
             protocol::Command::PlaybackStreamSuspended(protocol::StreamSuspendedParams {
-                stream_index,
+                stream_index: channel,
                 suspended,
             }) => {
-                if let Some(stream) = state
-                    .playback_streams
-                    .values()
-                    .find(|s| s.stream_info.stream_index == stream_index)
-                {
+                if let Some(stream) = state.playback_streams.get(&channel) {
                     stream.events.set_suspended(suspended);
                 }
             }
             protocol::Command::RecordStreamSuspended(protocol::StreamSuspendedParams {
-                stream_index,
+                stream_index: channel,
                 suspended,
             }) => {
-                if let Some(stream) = state
-                    .record_streams
-                    .values()
-                    .find(|s| s.stream_index == stream_index)
-                {
+                if let Some(stream) = state.record_streams.get(&channel) {
                     stream.events.set_suspended(suspended);
                 }
             }
             protocol::Command::PlaybackStreamMoved(protocol::PlaybackStreamMovedParams {
-                stream_index,
+                stream_index: channel,
                 ..
             }) => {
-                if let Some(stream) = state
-                    .playback_streams
-                    .values()
-                    .find(|s| s.stream_info.stream_index == stream_index)
-                {
+                if let Some(stream) = state.playback_streams.get(&channel) {
                     stream.events.record_move();
                 }
             }
             protocol::Command::RecordStreamMoved(protocol::RecordStreamMovedParams {
-                stream_index,
+                stream_index: channel,
                 ..
             }) => {
-                if let Some(stream) = state
-                    .record_streams
-                    .values()
-                    .find(|s| s.stream_index == stream_index)
-                {
+                if let Some(stream) = state.record_streams.get(&channel) {
                     stream.events.record_move();
                 }
             }

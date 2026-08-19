@@ -545,6 +545,34 @@ mod tests {
         .unwrap()
     }
 
+    fn playback_stream_params() -> protocol::PlaybackStreamParams {
+        protocol::PlaybackStreamParams {
+            sample_spec: protocol::SampleSpec {
+                format: protocol::SampleFormat::S16Le,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    fn record_stream_params() -> protocol::RecordStreamParams {
+        protocol::RecordStreamParams {
+            sample_spec: protocol::SampleSpec {
+                format: protocol::SampleFormat::S16Le,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    fn silence_source() -> impl PlaybackSource {
+        (move |buf: &mut [u8]| {
+            buf.fill(0);
+            buf.len()
+        })
+        .as_playback_source()
+    }
+
     #[test_log::test]
     fn server_info() -> anyhow::Result<()> {
         let client =
@@ -884,6 +912,102 @@ mod tests {
                 .find(|client| client.name == client1_info.name)
                 .is_none()
         );
+
+        Ok(())
+    }
+
+    #[test_log::test]
+    fn move_sink_input() -> anyhow::Result<()> {
+        let client =
+            Client::from_env(random_client_name()).context("connecting to PulseAudio server")?;
+
+        let sinks = block_on(client.list_sinks())?;
+        assert!(!sinks.is_empty());
+
+        let params = protocol::PlaybackStreamParams {
+            sink_index: Some(sinks[0].index),
+            ..playback_stream_params()
+        };
+        let stream = block_on(client.create_playback_stream(params, silence_source()))?;
+
+        let Some(target) = sinks.iter().find(|s| s.index != sinks[0].index) else {
+            // Only one sink available in this environment; the move itself
+            // can't be exercised.
+            return Ok(());
+        };
+
+        block_on(client.move_sink_input(stream.stream_index(), target.index))?;
+        let start = time::Instant::now();
+        loop {
+            if stream.status().moves >= 1 {
+                break;
+            }
+            if start.elapsed() >= time::Duration::from_secs(1) {
+                panic!("stream was never marked as moved");
+            }
+            std::thread::sleep(time::Duration::from_millis(10));
+        }
+
+        block_on(client.move_sink_input_by_name(stream.stream_index(), sinks[0].name.clone()))?;
+        let start = time::Instant::now();
+        loop {
+            if stream.status().moves >= 2 {
+                break;
+            }
+            if start.elapsed() >= time::Duration::from_secs(1) {
+                panic!("stream was never marked as moved a second time");
+            }
+            std::thread::sleep(time::Duration::from_millis(10));
+        }
+
+        Ok(())
+    }
+
+    #[test_log::test]
+    fn move_source_output() -> anyhow::Result<()> {
+        let client =
+            Client::from_env(random_client_name()).context("connecting to PulseAudio server")?;
+
+        let sources = block_on(client.list_sources())?;
+        assert!(!sources.is_empty());
+
+        let params = protocol::RecordStreamParams {
+            source_index: Some(sources[0].index),
+            ..record_stream_params()
+        };
+        let stream = block_on(client.create_record_stream(params, |_: &[u8]| {}))?;
+
+        let Some(target) = sources.iter().find(|s| s.index != sources[0].index) else {
+            // Only one source available in this environment; the move itself
+            // can't be exercised.
+            return Ok(());
+        };
+
+        block_on(client.move_source_output(stream.stream_index(), target.index))?;
+        let start = time::Instant::now();
+        loop {
+            if stream.status().moves >= 1 {
+                break;
+            }
+            if start.elapsed() >= time::Duration::from_secs(1) {
+                panic!("stream was never marked as moved");
+            }
+            std::thread::sleep(time::Duration::from_millis(10));
+        }
+
+        block_on(
+            client.move_source_output_by_name(stream.stream_index(), sources[0].name.clone()),
+        )?;
+        let start = time::Instant::now();
+        loop {
+            if stream.status().moves >= 2 {
+                break;
+            }
+            if start.elapsed() >= time::Duration::from_secs(1) {
+                panic!("stream was never marked as moved a second time");
+            }
+            std::thread::sleep(time::Duration::from_millis(10));
+        }
 
         Ok(())
     }
