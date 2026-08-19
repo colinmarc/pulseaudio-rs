@@ -1204,8 +1204,14 @@ mod tests {
         // Give the fire-and-forget unsubscribe issued by Drop time to reach the server.
         std::thread::sleep(time::Duration::from_millis(300));
 
-        let stream2 =
-            block_on(client.create_playback_stream(playback_stream_params(), silence_source()))?;
+        // A distinct sync_id, since PulseAudio treats two streams from the same
+        // connection sharing a sync_id (including the default of 0) as a sync group,
+        // which is not what we want for two independent streams here.
+        let stream2_params = protocol::PlaybackStreamParams {
+            sync_id: 1,
+            ..playback_stream_params()
+        };
+        let stream2 = block_on(client.create_playback_stream(stream2_params, silence_source()))?;
         let event = recv_matching(&rx, time::Duration::from_millis(300), |e| {
             e.index == Some(stream2.stream_index())
         });
