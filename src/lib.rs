@@ -73,7 +73,8 @@ pub fn cookie_path_from_env() -> Option<PathBuf> {
         .map(PathBuf::from)
         .into_iter()
         .chain(std::iter::once(home.join(".config/pulse/cookie")))
-        .chain(std::iter::once(home.join(".pulse-cookie")));
+        .chain(std::iter::once(home.join(".pulse-cookie")))
+        .chain(std::iter::once("/var/config/pulse/cookie".into()));
 
     paths.find(|path| path.exists())
 }
