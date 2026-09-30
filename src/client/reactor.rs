@@ -9,6 +9,7 @@ use std::{
     },
     task::{Context, Poll},
     thread::JoinHandle,
+    time::Duration,
 };
 
 use futures::channel::oneshot;
@@ -261,6 +262,19 @@ impl ReactorHandle {
 pub(super) const WAKER: mio::Token = mio::Token(0);
 pub(super) const SOCKET: mio::Token = mio::Token(1);
 
+/// The initial size of the read buffer. It grows if a message doesn't fit.
+const READ_BUF_SIZE: usize = 64 * 1024;
+
+/// The maximum number of socket reads per iteration of the event loop. This
+/// keeps a constant flow of incoming data (for example, from a record stream)
+/// from starving writes.
+const MAX_READS_PER_ITERATION: usize = 16;
+
+/// The alignment of record stream data passed to a [RecordSink], which is
+/// enough for any sample format. Consumers may rely on it to reinterpret the
+/// bytes as samples.
+const RECORD_DATA_ALIGN: usize = 4;
+
 pub(super) struct Reactor {
     socket: UnixStream,
     poll: mio::Poll,
@@ -270,8 +284,9 @@ pub(super) struct Reactor {
     protocol_version: u16,
 
     write_buf: Vec<u8>,
+    // Only read_buf[..read_len] contains data; the rest is space to read into.
     read_buf: Vec<u8>,
-    in_progress_read: Option<protocol::Descriptor>,
+    read_len: usize,
 }
 
 impl Reactor {
@@ -299,8 +314,8 @@ impl Reactor {
             protocol_version,
 
             write_buf: Vec::new(),
-            read_buf: Vec::new(),
-            in_progress_read: None,
+            read_buf: vec![0; READ_BUF_SIZE],
+            read_len: 0,
         };
 
         let reactor_thread = std::thread::spawn(move || match reactor.run() {
@@ -325,80 +340,111 @@ impl Reactor {
 
     pub(super) fn run(&mut self) -> Result<(), ClientError> {
         let mut events = mio::Events::with_capacity(1024);
+        let mut more_to_read = false;
 
         loop {
-            self.poll.poll(&mut events, None)?;
-            self.recv()?;
+            // The socket is edge-triggered, so if we stopped reading before
+            // draining it, there won't be another event for the pending data.
+            let timeout = more_to_read.then_some(Duration::ZERO);
+            self.poll.poll(&mut events, timeout)?;
+            more_to_read = self.recv()?;
 
             // Handle any requested writes.
             self.write_streams()?;
-            self.write_commands()?;
-        }
-    }
-
-    fn recv(&mut self) -> Result<(), ClientError> {
-        use io::Read;
-
-        'read: loop {
-            let off = self.read_buf.len();
-            self.read_buf.resize(off + 1024 * 1024, 0);
-
-            match self.socket.read(&mut self.read_buf[off..]) {
-                Ok(0) => return Err(ClientError::Disconnected),
-                Ok(n) => self.read_buf.truncate(off + n),
-                Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
-                    self.read_buf.truncate(off);
-                    return Ok(());
-                }
-                Err(err) => return Err(err.into()),
-            };
-
-            // Decode messages (there may be multiple).
-            while !self.read_buf.is_empty() {
-                // Continue the previous read, if it was unfinished.
-                let desc = if let Some(desc) = self.in_progress_read.take() {
-                    desc
-                } else if self.read_buf.len() >= protocol::DESCRIPTOR_SIZE {
-                    protocol::read_descriptor(&mut io::Cursor::new(&self.read_buf))?
-                } else {
-                    log::trace!("very short read ({} bytes)", self.read_buf.len());
-                    continue 'read;
-                };
-
-                // If we don't have all the message, poll until we do.
-                let len = desc.length as usize + protocol::DESCRIPTOR_SIZE;
-                if self.read_buf.len() < len {
-                    self.in_progress_read = Some(desc);
-                    log::trace!("partial read ({}/{} bytes)", self.read_buf.len(), len);
-                    continue 'read;
-                }
-
-                if desc.channel == u32::MAX {
-                    self.handle_command(len);
-                } else {
-                    // Stream data for a record stream.
-                    let mut guard = self.state.lock().unwrap();
-                    if let Some(RecordStreamState { sink, start_notify }) =
-                        guard.record_streams.get_mut(&desc.channel)
-                    {
-                        log::trace!("reading {len} bytes from stream {}", desc.channel,);
-                        if let Some(start_notify) = start_notify.take() {
-                            let _ = start_notify.send(());
-                        }
-
-                        sink.write(&self.read_buf[protocol::DESCRIPTOR_SIZE..len])
-                    } else {
-                        log::warn!("Received data for unknown record stream {}", desc.channel);
-                    }
-                }
-
-                self.read_buf.drain(..len);
+            if !self.write_commands()? {
+                log::debug!("client dropped, stopping reactor");
+                return Ok(());
             }
         }
     }
 
-    fn handle_command(&mut self, len: usize) {
-        let mut cursor = io::Cursor::new(&self.read_buf[protocol::DESCRIPTOR_SIZE..len]);
+    /// Reads and handles incoming messages. Returns true if there may be more
+    /// data to read, i.e. the read limit was reached before the socket would
+    /// block.
+    fn recv(&mut self) -> Result<bool, ClientError> {
+        use io::Read;
+
+        for _ in 0..MAX_READS_PER_ITERATION {
+            match self.socket.read(&mut self.read_buf[self.read_len..]) {
+                Ok(0) => return Err(ClientError::Disconnected),
+                Ok(n) => self.read_len += n,
+                Err(err) if err.kind() == io::ErrorKind::WouldBlock => return Ok(false),
+                Err(err) if err.kind() == io::ErrorKind::Interrupted => continue,
+                Err(err) => return Err(err.into()),
+            };
+
+            self.handle_messages()?;
+        }
+
+        Ok(true)
+    }
+
+    /// Handles all complete messages in the read buffer, then moves any
+    /// remaining partial message to the front of the buffer.
+    fn handle_messages(&mut self) -> Result<(), ClientError> {
+        // Decode messages (there may be multiple).
+        let mut pos = 0;
+        let mut needed = 0;
+        while self.read_len - pos >= protocol::DESCRIPTOR_SIZE {
+            let desc = protocol::read_descriptor(&mut io::Cursor::new(
+                &self.read_buf[pos..self.read_len],
+            ))?;
+
+            // If we don't have all the message, poll until we do.
+            let len = desc.length as usize + protocol::DESCRIPTOR_SIZE;
+            if self.read_len - pos < len {
+                log::trace!("partial read ({}/{} bytes)", self.read_len - pos, len);
+                needed = len;
+                break;
+            }
+
+            if desc.channel == u32::MAX {
+                let msg = &self.read_buf[pos + protocol::DESCRIPTOR_SIZE..pos + len];
+                self.handle_command(msg);
+            } else {
+                // Messages are packed back to back, so the data may be
+                // misaligned. If so, move it to the front of the buffer.
+                let addr = self.read_buf[pos + protocol::DESCRIPTOR_SIZE..].as_ptr() as usize;
+                if !addr.is_multiple_of(RECORD_DATA_ALIGN) {
+                    self.read_buf.copy_within(pos..self.read_len, 0);
+                    self.read_len -= pos;
+                    pos = 0;
+                }
+
+                let msg = &self.read_buf[pos + protocol::DESCRIPTOR_SIZE..pos + len];
+
+                // Stream data for a record stream.
+                let mut guard = self.state.lock().unwrap();
+                if let Some(RecordStreamState { sink, start_notify }) =
+                    guard.record_streams.get_mut(&desc.channel)
+                {
+                    log::trace!("reading {len} bytes from stream {}", desc.channel,);
+                    if let Some(start_notify) = start_notify.take() {
+                        let _ = start_notify.send(());
+                    }
+
+                    sink.write(msg)
+                } else {
+                    log::warn!("Received data for unknown record stream {}", desc.channel);
+                }
+            }
+
+            pos += len;
+        }
+
+        self.read_buf.copy_within(pos..self.read_len, 0);
+        self.read_len -= pos;
+
+        // Make sure the rest of a partial message fits.
+        if needed > self.read_buf.len() {
+            self.read_buf.resize(needed, 0);
+        }
+
+        Ok(())
+    }
+
+    fn handle_command(&self, msg: &[u8]) {
+        let mut cursor = io::Cursor::new(msg);
         let (seq, cmd) =
             match protocol::Command::read_tag_prefixed(&mut cursor, self.protocol_version) {
                 Ok((seq, cmd)) => (seq, cmd),
@@ -444,11 +490,12 @@ impl Reactor {
         }
     }
 
-    fn write_commands(&mut self) -> Result<(), ClientError> {
+    /// Writes queued commands. Returns false if the client has been dropped.
+    fn write_commands(&mut self) -> Result<bool, ClientError> {
         loop {
             // Drain the write buffer...
             if !drain_buf(&mut self.write_buf, &mut self.socket)? {
-                return Ok(());
+                return Ok(true);
             }
 
             // ...and encode new command messages into it.
@@ -462,8 +509,8 @@ impl Reactor {
                         self.protocol_version,
                     )?;
                 }
-                Err(TryRecvError::Empty) => return Ok(()),
-                Err(TryRecvError::Disconnected) => return Err(ClientError::Disconnected),
+                Err(TryRecvError::Empty) => return Ok(true),
+                Err(TryRecvError::Disconnected) => return Ok(false),
             };
         }
     }
