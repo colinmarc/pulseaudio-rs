@@ -114,6 +114,10 @@ impl Client {
 
             let mut props = protocol::Props::new();
             props.set(protocol::Prop::ApplicationName, client_name.as_ref());
+            props.set(
+                protocol::Prop::ApplicationProcessId,
+                CString::new(std::process::id().to_string()).unwrap(),
+            );
 
             let _: protocol::SetClientNameReply = roundtrip_blocking(
                 &mut reader,
