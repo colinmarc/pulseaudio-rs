@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - run: sudo apt-get install pulseaudio
+    - run: sudo apt update && sudo apt install -y pulseaudio
     - run: systemctl --user enable pulseaudio
     - run: systemctl --user start pulseaudio
     - run: pactl load-module module-null-sink sink_name=test_sink
