@@ -136,19 +136,20 @@ impl PlaybackStream {
     }
 
     /// Waits until the given [AudioSource] has reached the end (and returns 0 in [AudioSource::poll_read]),
-    /// and then instructs the server to drain the buffer before ending the stream.
+    /// and then instructs the server to drain the buffer.
     pub async fn play_all(&self) -> ClientResult<()> {
         self.source_eof().await?;
         self.drain().await?;
         Ok(())
     }
 
-    /// Instructs the server to play any remaining data in the buffer, then end
-    /// the stream. This method returns once the stream has finished.
+    /// Instructs the server to play any remaining data in the buffer. This
+    /// method returns once the buffer has been fully played out.
+    ///
+    /// The stream remains connected and usable after the buffer has drained;
+    /// it can be fed more data (e.g. after [PlaybackStream::cork] and
+    /// [PlaybackStream::uncork]) without needing to be recreated.
     pub async fn drain(&self) -> ClientResult<()> {
-        self.0
-            .handle
-            .mark_playback_stream_draining(self.0.info.channel);
         self.0
             .handle
             .roundtrip_ack(protocol::Command::DrainPlaybackStream(self.0.info.channel))

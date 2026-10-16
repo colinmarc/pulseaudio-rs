@@ -27,7 +27,7 @@ struct PlaybackStreamState {
     source: Pin<Box<dyn PlaybackSource>>,
 
     requested_bytes: usize,
-    done: bool,
+    eof: bool,
     eof_notify: Option<oneshot::Sender<()>>,
 }
 
@@ -132,7 +132,7 @@ impl ReactorHandle {
                     source: Box::pin(source),
 
                     requested_bytes,
-                    done: false,
+                    eof: false,
                     eof_notify,
                 },
             );
@@ -166,14 +166,6 @@ impl ReactorHandle {
 
         self.write_command(seq, protocol::Command::DeletePlaybackStream(channel))?;
         rx.await.map_err(|_| ClientError::Disconnected)
-    }
-
-    pub(super) fn mark_playback_stream_draining(&self, channel: u32) {
-        if let Some(state) = self.state.upgrade()
-            && let Some(stream) = state.lock().unwrap().playback_streams.get_mut(&channel)
-        {
-            stream.done = true;
-        }
     }
 
     pub(super) async fn insert_record_stream(
@@ -475,7 +467,7 @@ impl Reactor {
 
         let mut state = self.state.lock().unwrap();
         for stream in state.playback_streams.values_mut() {
-            if stream.done {
+            if stream.eof {
                 continue;
             }
 
@@ -495,8 +487,8 @@ impl Reactor {
                             stream.stream_info.channel
                         );
 
-                        stream.done = true;
-                        stream.eof_notify.take().map(|done| done.send(()));
+                        stream.eof = true;
+                        stream.eof_notify.take().map(|eof| eof.send(()));
                         self.write_buf.clear();
                         break;
                     }
