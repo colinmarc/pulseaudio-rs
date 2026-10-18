@@ -212,7 +212,7 @@ impl TagStructWrite for SourceInfo {
         w.write_index(Some(self.index))?;
         w.write_string(Some(&self.name))?;
         w.write_string(self.description.as_ref())?;
-        w.write(self.sample_spec)?;
+        w.write(self.sample_spec.protocol_downgrade(protocol_version))?;
         w.write(self.channel_map)?;
         w.write_index(self.owner_module_index)?;
         w.write(self.cvolume)?;
@@ -243,6 +243,11 @@ impl TagStructWrite for SourceInfo {
                 w.write_u32(port.priority)?;
                 if protocol_version >= 24 {
                     w.write_u32(port.available as u32)?;
+                }
+
+                if protocol_version >= 34 {
+                    w.write_string(port.availability_group.as_ref())?;
+                    w.write_u32(port.port_type as u32)?;
                 }
             }
 
@@ -331,7 +336,7 @@ impl TagStructWrite for SourceInfoList {
 
 #[cfg(test)]
 mod tests {
-    use serde::test_util::test_serde;
+    use serde::test_util::{test_serde, test_serde_version};
 
     use super::*;
 
@@ -344,6 +349,40 @@ mod tests {
         };
 
         test_serde(&source)
+    }
+
+    #[test]
+    fn source_info_with_ports_serde() -> anyhow::Result<()> {
+        let mut source = SourceInfo {
+            index: 0,
+            name: CString::new("mic").unwrap(),
+            ports: vec![PortInfo {
+                name: CString::new("analog-input-mic").unwrap(),
+                port_type: PortType::Unknown,
+                description: Some(CString::new("Microphone").unwrap()),
+                dir: PortDirection::Output,
+                priority: 1,
+                available: PortAvailable::Unknown,
+                availability_group: None,
+            }],
+            ..Default::default()
+        };
+
+        // Ports are only sent from version 16.
+        for version in 16..=MAX_VERSION {
+            test_serde_version(&source, version)?;
+        }
+
+        // The availability group and port type are only sent from version 34.
+        source.ports[0].available = PortAvailable::Yes;
+        source.ports[0].availability_group = Some(CString::new("Legacy 1").unwrap());
+        source.ports[0].port_type = PortType::Mic;
+
+        for version in 34..=MAX_VERSION {
+            test_serde_version(&source, version)?;
+        }
+
+        Ok(())
     }
 }
 

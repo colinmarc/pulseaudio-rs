@@ -694,3 +694,41 @@ impl TagStructWrite for Command {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::test_util::roundtrip;
+
+    #[test]
+    fn info_replies_downgrade_s24_for_old_clients() -> anyhow::Result<()> {
+        // S24 formats only exist from version 15, so older clients get float
+        // instead, as with PulseAudio's fixup_sample_spec.
+        fn check<T>(spec: fn(&mut T) -> &mut SampleSpec) -> anyhow::Result<()>
+        where
+            T: TagStructRead + TagStructWrite + Default,
+        {
+            for (version, expected) in [(14, SampleFormat::Float32Le), (15, SampleFormat::S24Le)] {
+                let mut info = T::default();
+                spec(&mut info).format = SampleFormat::S24Le;
+
+                let mut read = roundtrip(&info, version)?;
+                assert_eq!(
+                    spec(&mut read).format,
+                    expected,
+                    "{} at protocol version {version}",
+                    std::any::type_name::<T>()
+                );
+            }
+
+            Ok(())
+        }
+
+        check::<SinkInfo>(|i| &mut i.sample_spec)?;
+        check::<SourceInfo>(|i| &mut i.sample_spec)?;
+        check::<SinkInputInfo>(|i| &mut i.sample_spec)?;
+        check::<SourceOutputInfo>(|i| &mut i.sample_spec)?;
+        check::<SampleInfo>(|i| &mut i.sample_spec)?;
+        check::<ServerInfo>(|i| &mut i.sample_spec)
+    }
+}

@@ -456,11 +456,11 @@ pub mod test_util {
         Ok(())
     }
 
-    /// Tests that a given version of the protocol can roundtrip the given tagstruct.
-    pub fn test_serde_version<T>(v: &T, version: u16) -> anyhow::Result<()>
+    /// Writes the given tagstruct with a given version of the protocol, and
+    /// reads it back.
+    pub fn roundtrip<T>(v: &T, version: u16) -> anyhow::Result<T>
     where
-        T: TagStructRead + TagStructWrite + std::fmt::Debug,
-        for<'a> &'a T: PartialEq,
+        T: TagStructRead + TagStructWrite,
     {
         let mut buf = Vec::new();
 
@@ -471,7 +471,16 @@ pub mod test_util {
 
         let mut cursor = Cursor::new(buf);
         let mut ts = TagStructReader::new(&mut cursor, version);
-        let v2 = T::read(&mut ts, version)?;
+        Ok(T::read(&mut ts, version)?)
+    }
+
+    /// Tests that a given version of the protocol can roundtrip the given tagstruct.
+    pub fn test_serde_version<T>(v: &T, version: u16) -> anyhow::Result<()>
+    where
+        T: TagStructRead + TagStructWrite + std::fmt::Debug,
+        for<'a> &'a T: PartialEq,
+    {
+        let v2 = roundtrip(v, version)?;
 
         assert_eq!(v, &v2, "roundtrip failed for protocol version {}", version);
 

@@ -63,13 +63,13 @@ impl TagStructWrite for ServerInfo {
     fn write(
         &self,
         w: &mut TagStructWriter<'_>,
-        _protocol_version: u16,
+        protocol_version: u16,
     ) -> Result<(), ProtocolError> {
         w.write_string(self.server_name.as_ref())?;
         w.write_string(self.server_version.as_ref())?;
         w.write_string(self.user_name.as_ref())?;
         w.write_string(self.host_name.as_ref())?;
-        w.write(self.sample_spec)?;
+        w.write(self.sample_spec.protocol_downgrade(protocol_version))?;
         w.write_string(self.default_sink_name.as_ref())?;
         w.write_string(self.default_source_name.as_ref())?;
         w.write_u32(self.cookie)?;
