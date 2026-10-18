@@ -69,13 +69,13 @@ impl TagStructWrite for SampleInfo {
     fn write(
         &self,
         w: &mut TagStructWriter<'_>,
-        _protocol_version: u16,
+        protocol_version: u16,
     ) -> Result<(), ProtocolError> {
         w.write_u32(self.index)?;
         w.write_string(Some(&self.name))?;
         w.write(self.cvolume)?;
         w.write_usec(self.duration)?;
-        w.write(self.sample_spec)?;
+        w.write(self.sample_spec.protocol_downgrade(protocol_version))?;
         w.write(self.channel_map)?;
         w.write_u32(self.length)?;
         w.write_bool(self.lazy.is_some())?;

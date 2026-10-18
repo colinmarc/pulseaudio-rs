@@ -212,7 +212,7 @@ impl TagStructWrite for SourceInfo {
         w.write_index(Some(self.index))?;
         w.write_string(Some(&self.name))?;
         w.write_string(self.description.as_ref())?;
-        w.write(self.sample_spec)?;
+        w.write(self.sample_spec.protocol_downgrade(protocol_version))?;
         w.write(self.channel_map)?;
         w.write_index(self.owner_module_index)?;
         w.write(self.cvolume)?;

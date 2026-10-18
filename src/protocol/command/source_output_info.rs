@@ -108,7 +108,7 @@ impl TagStructWrite for SourceOutputInfo {
         w.write_index(self.owner_module_index)?;
         w.write_index(self.client_index)?;
         w.write_u32(self.source_index)?;
-        w.write(self.sample_spec)?;
+        w.write(self.sample_spec.protocol_downgrade(protocol_version))?;
         w.write(self.channel_map)?;
         w.write_usec(self.buffer_latency)?;
         w.write_usec(self.source_latency)?;

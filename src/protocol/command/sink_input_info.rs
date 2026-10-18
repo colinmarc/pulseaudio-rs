@@ -111,7 +111,7 @@ impl TagStructWrite for SinkInputInfo {
         w.write_index(self.owner_module_index)?;
         w.write_index(self.client_index)?;
         w.write_u32(self.sink_index)?;
-        w.write(self.sample_spec)?;
+        w.write(self.sample_spec.protocol_downgrade(protocol_version))?;
         w.write(self.channel_map)?;
         w.write(self.cvolume)?;
         w.write_usec(self.buffer_latency)?;
