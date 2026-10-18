@@ -42,8 +42,15 @@ bitflags! {
 }
 
 /// The state of a sink.
+///
+/// `Invalid`, `Init` and `Unlinked` are server-side states, but clients can
+/// still see them: pipewire-pulse, for example, reports `Init` for a sink it
+/// has announced but not finished creating.
+#[repr(u32)]
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Primitive)]
 pub enum SinkState {
+    /// The server does not support sink state introspection.
+    Invalid = -1i32 as u32,
     /// Sink is playing samples: The sink is used by at least one non-paused input.
     Running = 0,
     /// Sink is playing but has no connected inputs that send samples.
@@ -52,6 +59,10 @@ pub enum SinkState {
     // FIXME: Is this what pasuspender uses?
     #[default]
     Suspended = 2,
+    /// Sink is being initialized.
+    Init = -2i32 as u32,
+    /// Sink is being unregistered and removed from client access.
+    Unlinked = -3i32 as u32,
 }
 
 /// A sink connected to a PulseAudio server.
@@ -378,7 +389,41 @@ mod tests {
     use std::ffi::CString;
 
     use super::*;
-    use crate::protocol::serde::test_util::test_serde;
+    use crate::protocol::serde::test_util::{test_serde, test_serde_version};
+
+    #[test]
+    fn sink_state_wire_values() {
+        use num_traits::FromPrimitive as _;
+
+        // The server-side states are negative, but travel as a u32.
+        for (wire, state) in [
+            (0xFFFF_FFFF, SinkState::Invalid),
+            (0, SinkState::Running),
+            (1, SinkState::Idle),
+            (2, SinkState::Suspended),
+            (0xFFFF_FFFE, SinkState::Init),
+            (0xFFFF_FFFD, SinkState::Unlinked),
+        ] {
+            assert_eq!(SinkState::from_u32(wire), Some(state));
+            assert_eq!(state as u32, wire);
+        }
+    }
+
+    #[test]
+    fn sink_info_server_side_state_serde() -> anyhow::Result<()> {
+        let sink = SinkInfo {
+            name: CString::new("sink0").unwrap(),
+            state: SinkState::Init,
+            ..Default::default()
+        };
+
+        // The state is only sent from protocol version 15 onwards.
+        for version in 15..=MAX_VERSION {
+            test_serde_version(&sink, version)?;
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn sink_info_list_serde() {

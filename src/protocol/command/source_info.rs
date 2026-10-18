@@ -5,8 +5,15 @@ use enum_primitive_derive::Primitive;
 use crate::protocol::{port_info::*, *};
 
 /// The state of a source.
+///
+/// `Invalid`, `Init` and `Unlinked` are server-side states, but clients can
+/// still see them: pipewire-pulse, for example, reports `Init` for a source it
+/// has announced but not finished creating.
+#[repr(u32)]
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Primitive)]
 pub enum SourceState {
+    /// The server does not support source state introspection.
+    Invalid = -1i32 as u32,
     /// The source is recording and used by at least one non-corked source-output.
     Running = 0,
     /// the source is still recording, but there is no non-corked source-output.
@@ -14,6 +21,10 @@ pub enum SourceState {
     /// The source is suspended and not recording.
     #[default]
     Suspended = 2,
+    /// The source is being initialized.
+    Init = -2i32 as u32,
+    /// The source is being unregistered and removed from client access.
+    Unlinked = -3i32 as u32,
 }
 
 bitflags! {
@@ -331,7 +342,7 @@ impl TagStructWrite for SourceInfoList {
 
 #[cfg(test)]
 mod tests {
-    use serde::test_util::test_serde;
+    use serde::test_util::{test_serde, test_serde_version};
 
     use super::*;
 
@@ -344,6 +355,40 @@ mod tests {
         };
 
         test_serde(&source)
+    }
+
+    #[test]
+    fn source_state_wire_values() {
+        use num_traits::FromPrimitive as _;
+
+        // The server-side states are negative, but travel as a u32.
+        for (wire, state) in [
+            (0xFFFF_FFFF, SourceState::Invalid),
+            (0, SourceState::Running),
+            (1, SourceState::Idle),
+            (2, SourceState::Suspended),
+            (0xFFFF_FFFE, SourceState::Init),
+            (0xFFFF_FFFD, SourceState::Unlinked),
+        ] {
+            assert_eq!(SourceState::from_u32(wire), Some(state));
+            assert_eq!(state as u32, wire);
+        }
+    }
+
+    #[test]
+    fn source_info_server_side_state_serde() -> anyhow::Result<()> {
+        let source = SourceInfo {
+            name: CString::new("test").unwrap(),
+            state: SourceState::Init,
+            ..Default::default()
+        };
+
+        // The state is only sent from protocol version 15 onwards.
+        for version in 15..=MAX_VERSION {
+            test_serde_version(&source, version)?;
+        }
+
+        Ok(())
     }
 }
 
