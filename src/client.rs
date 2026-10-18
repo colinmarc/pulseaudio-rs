@@ -65,10 +65,12 @@ impl Client {
     ///
     /// See the documentation for [socket_path_from_env](super::socket_path_from_env) and
     /// [cookie_path_from_env](super::cookie_path_from_env) for an explanation
-    /// of how the socket path and cookie are determined.
+    /// of how the socket path and cookie are determined. If no cookie file
+    /// exists, one is created the way libpulse does, at $PULSE_COOKIE if set
+    /// and otherwise at $HOME/.config/pulse/cookie.
     pub fn from_env(client_name: impl AsRef<CStr>) -> Result<Self> {
         let socket_path = super::socket_path_from_env().ok_or(ClientError::ServerUnavailable)?;
-        let cookie = super::cookie_path_from_env().and_then(|p| std::fs::read(p).ok());
+        let cookie = super::cookie_from_env();
 
         log::info!(
             "connecting to PulseAudio server at {}",

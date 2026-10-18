@@ -17,7 +17,7 @@
     variant_size_differences
 )]
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 mod client;
 pub mod protocol;
@@ -76,6 +76,103 @@ pub fn cookie_path_from_env() -> Option<PathBuf> {
         .chain(std::iter::once(home.join(".pulse-cookie")));
 
     paths.find(|path| path.exists())
+}
+
+fn cookie_from_env() -> Option<Vec<u8>> {
+    if let Some(path) = cookie_path_from_env() {
+        return std::fs::read(path).ok();
+    }
+
+    #[allow(deprecated)]
+    let path = std::env::var_os("PULSE_COOKIE")
+        .filter(|path| !path.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| std::env::home_dir().map(|home| home.join(".config/pulse/cookie")))?;
+
+    match create_cookie(&path) {
+        Ok(cookie) => Some(cookie),
+        Err(err) => {
+            log::warn!("failed to create cookie at {}: {err}", path.display());
+            None
+        }
+    }
+}
+
+fn create_cookie(path: &Path) -> std::io::Result<Vec<u8>> {
+    use std::{
+        fs,
+        io::{Read, Write},
+        os::unix::fs::{DirBuilderExt, OpenOptionsExt},
+        sync::atomic::{AtomicUsize, Ordering},
+    };
+
+    static DRAFTS: AtomicUsize = AtomicUsize::new(0);
+
+    let mut cookie = vec![0; 256];
+    fs::File::open("/dev/urandom")?.read_exact(&mut cookie)?;
+
+    if let Some(dir) = path.parent() {
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(dir)?;
+    }
+
+    let mut draft = path.as_os_str().to_owned();
+    draft.push(format!(
+        ".{}.{}",
+        std::process::id(),
+        DRAFTS.fetch_add(1, Ordering::Relaxed)
+    ));
+
+    let linked = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(&draft)
+        .and_then(|mut file| file.write_all(&cookie))
+        .and_then(|()| fs::hard_link(&draft, path));
+    let _ = fs::remove_file(&draft);
+
+    match linked {
+        Ok(()) => Ok(cookie),
+        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => fs::read(path),
+        Err(err) => Err(err),
+    }
+}
+
+#[cfg(test)]
+mod cookie_test {
+    use std::os::unix::fs::PermissionsExt;
+
+    use super::*;
+
+    #[test]
+    fn create_cookie_like_libpulse() -> std::io::Result<()> {
+        let dir = std::env::temp_dir().join(format!("pulseaudio-cookie-{}", std::process::id()));
+        let path = dir.join("pulse/cookie");
+
+        let created = create_cookie(&path)?;
+        assert_eq!(created.len(), 256);
+        assert_eq!(std::fs::read(&path)?, created);
+        assert_eq!(
+            std::fs::metadata(&path)?.permissions().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(
+            std::fs::metadata(path.parent().unwrap())?
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+
+        assert_eq!(create_cookie(&path)?, created);
+        assert_eq!(std::fs::read_dir(path.parent().unwrap())?.count(), 1);
+
+        std::fs::remove_dir_all(dir)
+    }
 }
 
 #[cfg(test)]
