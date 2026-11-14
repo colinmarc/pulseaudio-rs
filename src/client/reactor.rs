@@ -271,6 +271,7 @@ pub(super) struct Reactor {
 
     write_buf: Vec<u8>,
     read_buf: Vec<u8>,
+    read_scratch: Vec<u8>,
     in_progress_read: Option<protocol::Descriptor>,
 }
 
@@ -301,6 +302,7 @@ impl Reactor {
             write_buf: Vec::new(),
             read_buf: Vec::new(),
             in_progress_read: None,
+            read_scratch: Vec::new(),
         };
 
         let reactor_thread = std::thread::spawn(move || match reactor.run() {
@@ -340,14 +342,18 @@ impl Reactor {
         use io::Read;
 
         'read: loop {
-            let off = self.read_buf.len();
-            self.read_buf.resize(off + 1024 * 1024, 0);
-
-            match self.socket.read(&mut self.read_buf[off..]) {
+            // Read into the kept scratch and append only the bytes that
+            // arrived. Growing `read_buf` itself here zeroed a megabyte
+            // per wakeup: a wakeup of a 128-frame stream carries a few
+            // hundred bytes, so almost all of that zeroing was pure
+            // overhead on the connection thread.
+            if self.read_scratch.len() < 1024 * 1024 {
+                self.read_scratch.resize(1024 * 1024, 0);
+            }
+            match self.socket.read(&mut self.read_scratch) {
                 Ok(0) => return Err(ClientError::Disconnected),
-                Ok(n) => self.read_buf.truncate(off + n),
+                Ok(n) => self.read_buf.extend_from_slice(&self.read_scratch[..n]),
                 Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
-                    self.read_buf.truncate(off);
                     return Ok(());
                 }
                 Err(err) => return Err(err.into()),
