@@ -17,45 +17,48 @@
     variant_size_differences
 )]
 
-use std::path::PathBuf;
+use std::{ffi::OsString, path::PathBuf};
 
 mod client;
 pub mod protocol;
 pub use client::*;
 
-/// Attempts to determine the socket path from the runtime environment, checking
-/// the following locations in order:
-///   - $PULSE_SERVER
-///   - $PULSE_RUNTIME_PATH/pulse/native
+/// Attempts to determine the socket path from the runtime environment, as
+/// libpulse does:
+///   - $PULSE_SERVER, which names the only server to use
+///   - $PULSE_RUNTIME_PATH/native
 ///   - $XDG_RUNTIME_DIR/pulse/native
 ///
 /// Returns None if no socket can be found or if $PULSE_SERVER points to a
 /// remote server, i.e. starts with a prefix other than 'unix:'.
 pub fn socket_path_from_env() -> Option<PathBuf> {
-    let paths = std::env::var("PULSE_SERVER")
-        .ok()
-        .filter(|s| s.starts_with("unix:"))
-        .map(|s| PathBuf::from(&s[5..]))
-        .into_iter()
-        .chain(
-            std::env::var("PULSE_RUNTIME_PATH")
-                .ok()
-                .map(|s| PathBuf::from(s).join("pulse/native")),
-        )
-        .chain(
-            std::env::var("XDG_RUNTIME_DIR")
-                .ok()
-                .map(|s| PathBuf::from(s).join("pulse/native")),
-        );
+    socket_path_from(
+        std::env::var_os("PULSE_SERVER"),
+        std::env::var_os("PULSE_RUNTIME_PATH"),
+        std::env::var_os("XDG_RUNTIME_DIR"),
+    )
+}
 
-    for path in paths {
+fn socket_path_from(
+    server: Option<OsString>,
+    runtime_path: Option<OsString>,
+    xdg_runtime_dir: Option<OsString>,
+) -> Option<PathBuf> {
+    let usable = |path: PathBuf| {
         let stat = std::fs::metadata(&path).ok()?;
-        if !stat.permissions().readonly() {
-            return Some(path);
-        }
+        (!stat.permissions().readonly()).then_some(path)
+    };
+
+    if let Some(server) = server {
+        let path = server.to_str()?.strip_prefix("unix:")?;
+        return usable(PathBuf::from(path));
     }
 
-    None
+    runtime_path
+        .map(|dir| PathBuf::from(dir).join("native"))
+        .into_iter()
+        .chain(xdg_runtime_dir.map(|dir| PathBuf::from(dir).join("pulse/native")))
+        .find_map(usable)
 }
 
 /// Attempts to find the authentication cookie from the environment, checking
@@ -146,5 +149,67 @@ mod integration_test_util {
         let protocol_version = init_client(&mut sock)?;
 
         Ok((sock, protocol_version))
+    }
+}
+
+#[cfg(test)]
+mod socket_path_test {
+    use std::{ffi::OsString, fs, path::PathBuf};
+
+    use super::socket_path_from;
+
+    // A runtime directory holding the socket file at `socket` (relative)
+    fn runtime_dir(name: &str, socket: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("pulseaudio-rs-{}-{}", name, std::process::id()));
+        let path = dir.join(socket);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, b"").unwrap();
+        dir
+    }
+
+    fn os(path: &PathBuf) -> Option<OsString> {
+        Some(path.clone().into_os_string())
+    }
+
+    #[test]
+    fn falls_through_to_the_next_location() {
+        let xdg = runtime_dir("fallthrough", "pulse/native");
+        let missing = std::env::temp_dir().join("pulseaudio-rs-missing");
+
+        assert_eq!(
+            socket_path_from(None, os(&missing), os(&xdg)),
+            Some(xdg.join("pulse/native"))
+        );
+    }
+
+    #[test]
+    fn pulse_runtime_path_holds_the_socket_itself() {
+        let runtime = runtime_dir("runtime", "native");
+
+        assert_eq!(
+            socket_path_from(None, os(&runtime), None),
+            Some(runtime.join("native"))
+        );
+    }
+
+    #[test]
+    fn pulse_server_is_the_only_server() {
+        let xdg = runtime_dir("server", "pulse/native");
+        let socket = xdg.join("pulse/native");
+        let unix = |path: &str| Some(OsString::from(format!("unix:{path}")));
+
+        assert_eq!(
+            socket_path_from(unix(socket.to_str().unwrap()), None, None),
+            Some(socket.clone())
+        );
+        assert_eq!(
+            socket_path_from(unix("/nonexistent/native"), None, os(&xdg)),
+            None
+        );
+        assert_eq!(
+            socket_path_from(Some("tcp:localhost:4713".into()), None, os(&xdg)),
+            None
+        );
     }
 }
